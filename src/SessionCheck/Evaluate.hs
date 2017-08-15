@@ -1,7 +1,8 @@
 {-# LANGUAGE GADTs #-}
 module SessionCheck.Evaluate where
 
-import Control.Concurrent.Chan
+import Control.Concurrent.STM.TChan
+import Control.Concurrent.STM
 import Test.QuickCheck
 import Data.Maybe
 
@@ -12,6 +13,7 @@ data Status t = SSend t
               | Done
               | Skip
               | Step
+              | Timeout
               | Bad String
               | Amb String
               deriving (Ord, Eq)
@@ -21,24 +23,26 @@ instance Show t => Show (Status t) where
   show Done     = "Done"
   show Skip     = "Skip"
   show Step     = "Step"
+  show Timeout  = "Timeout"
   show (Bad e)  = "Bad: " ++ e
   show (Amb e)  = "Ambiguity: " ++ e
 
 isError :: Status t -> Bool
 isError s = case s of
-  Bad _ -> True
-  Amb _ -> True
-  _     -> False
+  Bad _   -> True
+  Amb _   -> True
+  Timeout -> True
+  _       -> False
 
 isSkip :: Status t -> Bool
 isSkip s = case s of
   Skip -> True
   _    -> False
 
-maybeSend :: Status t -> Chan t -> IO ()
+maybeSend :: Status t -> TChan t -> IO ()
 maybeSend st wc = case st of
-  SSend t -> writeChan wc t
-  _      -> return ()
+  SSend t -> atomically $ writeTChan wc t
+  _       -> return ()
 
 data Trace t where
   Hide :: Spec t a -> (a -> Spec t b) -> Trace t
@@ -68,58 +72,56 @@ traceAccepts t (Hide s _) = accepts s t
 traceProduces :: t -> Trace t -> Bool
 traceProduces t (Hide s _) = canProduce s t
 
-data Implementation t = CC { outputChan :: Chan t
-                           , inputChan  :: Chan t
+data Implementation t = CC { outputChan :: TChan t
+                           , inputChan  :: TChan t
                            , kill       :: IO () }
 
--- Rewrite this to use the channels directly instead of the lazy list as the
--- lazy list will block on stepping `Get`
 evaluate :: Show t => Implementation t -> Spec t a -> IO ()
-evaluate cc s = do
-  ts <- getChanContents (inputChan cc) 
-  s  <- eval (outputChan cc) ts 1 [hide s]
-  kill cc
+evaluate imp s = do
+  s  <- eval imp 1 [hide s]
+  kill imp 
   print s
 
-eval :: Show t => Chan t -> [t] -> Int -> [Trace t] -> IO (Status t)
-eval _ _  _ [] = return Done
-eval _ _  0 _  = return (Bad $ "no progress")
-eval wc ts fuel trs = do
-  (ts', trs', st) <- step ts trs
+eval :: Show t => Implementation t -> Int -> [Trace t] -> IO (Status t)
+eval _  _ [] = return Done
+eval _  0 _  = return (Bad $ "no progress")
+eval imp fuel trs = do
+  (trs', st) <- step imp trs
   let fuel' = if isSkip st then fuel - 1 else length trs'
   if isError st then
     return st
   else do
-    maybeSend st wc
-    eval wc ts' fuel' trs'
+    maybeSend st (outputChan imp)
+    eval imp fuel' trs'
 
-step :: [t] -> [Trace t] -> IO ([t], [Trace t], Status t)
-step ins [] = return (ins, [], Done)
-step ins trs@((Hide s c):ts) = case s of
-  Get p    ->
-    -- Add timeout here when we change to use the chan directly
-    case ins of
-      []     -> return (ins, trs, Bad $ "Ran out of inputs at: get " ++ name p)
-      (i:is) ->
+step :: Implementation t -> [Trace t] -> IO ([Trace t], Status t)
+step _ [] = return ([], Done)
+step imp trs@((Hide s c):ts) = case s of
+  Get p    -> do
+    mt <- atomically $ tryPeekTChan (inputChan imp)
+    case mt of
+      Nothing -> return (trs, Skip)
+      Just i  ->
         if test p i then
           if any (traceAccepts i) ts then
-            return (ins, trs, Amb $ "get " ++ name p) -- TODO better error here
-          else
-            return (is, ts ++ [hide $ c (fromJust (prj i))], Step)
+            return (trs, Amb $ "get " ++ name p) -- TODO better error here
+          else do
+            atomically $ readTChan (inputChan imp)
+            return (ts ++ [hide $ c (fromJust (prj i))], Step)
         else
-          return (i:is, ts ++ [Hide s c], Skip) 
+          return (ts ++ [Hide s c], Skip) 
 
   Send p   -> do
     a <- generate (satisfies p)
     if any (traceProduces (inj a)) ts then
-      return (ins, trs, Amb $ "send " ++ name p) -- TODO better error here
+      return (trs, Amb $ "send " ++ name p) -- TODO better error here
     else
-      return (ins, ts ++ [hide (c a)], SSend (inj a))
+      return (ts ++ [hide (c a)], SSend (inj a))
 
-  Fork t   -> return (ins, ts ++ [hide t, hide (c ())], Step)
+  Fork t   -> return (ts ++ [hide t, hide (c ())], Step)
 
-  Stop     -> return (ins, ts, Done)
+  Stop     -> return (ts, Done)
   
-  Return a -> return (ins, (Hide (c a) (\_ -> Stop)):ts, Step)
+  Return a -> return ((Hide (c a) (\_ -> Stop)):ts, Step)
 
-  Bind s f -> return (ins, (Hide s (\a -> f a >>= c)):ts, Step)
+  Bind s f -> return ((Hide s (\a -> f a >>= c)):ts, Step)
