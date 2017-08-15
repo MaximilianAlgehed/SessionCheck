@@ -23,6 +23,17 @@ instance Show t => Show (Status t) where
   show (Bad e) = "Bad: " ++ e
   show (Amb e) = "Ambiguity: " ++ e
 
+isError :: Status t -> Bool
+isError s = case s of
+  Bad _ -> True
+  Amb _ -> True
+  _     -> False
+
+isSkip :: Status t -> Bool
+isSkip s = case s of
+  Skip -> True
+  _    -> False
+
 data Trace t where
   Hide :: Spec t a -> (a -> Spec t b) -> Trace t
 
@@ -81,6 +92,18 @@ step ins trs@((Hide s c):ts) = case s of
 
   Bind s f -> return (ins, (Hide s (\a -> f a >>= c)):ts, Step)
 
--- TODO: implement this thing
-evaluate :: [t] -> Spec t a -> IO ()
-evaluate = undefined
+evaluate :: Show t => [t] -> Spec t a -> IO ()
+evaluate ts s = do
+  s <- eval ts 1 [hide s]
+  print s
+
+eval :: Show t => [t] -> Int -> [Trace t] -> IO (Status t)
+eval _  _ [] = return Done
+eval _  0 _  = return (Bad $ "no progress")
+eval ts fuel trs = do
+  (ts', trs', st) <- step ts trs
+  let fuel' = if isSkip st then fuel - 1 else length trs'
+  if isError st then
+    return st
+  else
+    eval ts' fuel' trs'
