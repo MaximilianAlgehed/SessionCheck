@@ -72,7 +72,7 @@ data Implementation t = CC { outputChan :: Chan t
                            , inputChan  :: Chan t
                            , kill       :: IO () }
 
-evaluate :: Show t => ComChan t -> Spec t a -> IO ()
+evaluate :: Show t => Implementation t -> Spec t a -> IO ()
 evaluate cc s = do
   ts <- getChanContents (inputChan cc) 
   s  <- eval (outputChan cc) ts 1 [hide s]
