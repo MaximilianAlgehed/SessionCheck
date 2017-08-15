@@ -1,13 +1,10 @@
 {-# LANGUAGE GADTs, TypeOperators #-}
-module SessionCheck.Types where
+module SessionCheck.Spec where
 
 import Control.Monad
 
 import SessionCheck.Classes
 import SessionCheck.Predicate
-
-test :: a :< t => Predicate a -> t -> Bool
-test p t = maybe False id (apply p <$> prj t)
 
 data Spec t a where
   Get   :: a :< t => Predicate a -> Spec t a

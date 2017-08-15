@@ -6,7 +6,7 @@ import Control.Concurrent.STM
 import Test.QuickCheck
 import Data.Maybe
 
-import SessionCheck.Types
+import SessionCheck.Spec
 import SessionCheck.Classes
 import SessionCheck.Predicate
 
