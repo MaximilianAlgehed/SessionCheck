@@ -59,10 +59,10 @@ maybeSend st imp = case st of
       return st
   _      -> return Skip
 
-data Trace t where
-  Hide :: Spec t a -> (a -> Spec t b) -> Trace t
+data Thread t where
+  Hide :: Spec t a -> (a -> Spec t b) -> Thread t
 
-hide :: Spec t a -> Trace t
+hide :: Spec t a -> Thread t
 hide s = Hide s (\_-> Stop)
 
 -- Check if a specification can accept a message
@@ -81,12 +81,12 @@ canProduce tr t = case tr of
   Bind tr _ -> canProduce tr t
   _         -> False
 
--- Lift `accepts` to a `Trace`
-traceAccepts :: t -> Trace t -> Bool
+-- Lift `accepts` to a `Thread`
+traceAccepts :: t -> Thread t -> Bool
 traceAccepts t (Hide s _) = accepts s t
 
--- Lift `canProduce` to a `Trace`
-traceProduces :: t -> Trace t -> Bool
+-- Lift `canProduce` to a `Thread`
+traceProduces :: t -> Thread t -> Bool
 traceProduces t (Hide s _) = canProduce s t
 
 -- TODO: Change this to return counterexample if found
@@ -97,7 +97,7 @@ evaluate imp s = do
   return s
 
 -- TODO: Use error monad transformer instead perhaps?
-eval :: Show t => Implementation t -> Int -> [Trace t] -> IO (Status t)
+eval :: Show t => Implementation t -> Int -> [Thread t] -> IO (Status t)
 eval _  _ [] = return Done -- We are finished
 eval _  0 _  = return (Bad $ "no progress") -- No thread made any progress
 eval imp fuel trs = do
@@ -116,7 +116,8 @@ eval imp fuel trs = do
     else
       return st
 
-step :: Implementation t -> [Trace t] -> IO ([Trace t], Status t)
+-- Take a single step in evaluating the current set of threads
+step :: Implementation t -> [Thread t] -> IO ([Thread t], Status t)
 step _ [] = return ([], Done)
 step imp trs@((Hide s c):ts) = case s of
   Get p    -> do
