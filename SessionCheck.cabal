@@ -1,0 +1,27 @@
+name:                SessionCheck
+version:             0.1.0.0
+-- synopsis:
+-- description:
+homepage:            https://github.com/MaximilianAlgehed/SessionCheck#README.md
+license:             BSD3
+license-file:        LICENSE
+author:              Maximilian Algehed
+maintainer:          algehed@chalmers.se
+copyright:           2017 Maximilian Algehed
+category:            Test 
+build-type:          Simple
+extra-source-files:  README.md
+cabal-version:       >=1.10
+
+library
+  hs-source-dirs:      src
+  exposed-modules:     SessionCheck.Types
+  build-depends:       base >= 4.7 && < 5,
+                       erlang >= 0.2.2 && < 0.3,
+                       mtl >= 2.2.1 && < 2.3,
+                       QuickCheck >= 2.9
+  default-language:    Haskell2010
+
+source-repository head
+  type:     git
+  location: https://github.com/MaximilianAlgehed/SessionCheck
