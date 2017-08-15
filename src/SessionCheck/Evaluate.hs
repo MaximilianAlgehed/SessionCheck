@@ -80,3 +80,7 @@ step ins trs@((Hide s c):ts) = case s of
   Return a -> return (ins, (Hide (c a) (\_ -> Stop)):ts, Step)
 
   Bind s f -> return (ins, (Hide s (\a -> f a >>= c)):ts, Step)
+
+-- TODO: implement this thing
+evaluate :: [t] -> Spec t a -> IO ()
+evaluate = undefined
