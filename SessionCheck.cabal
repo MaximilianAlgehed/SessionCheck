@@ -17,7 +17,9 @@ library
   hs-source-dirs:      src
   exposed-modules:     SessionCheck.Types,
                        SessionCheck.Classes,
-                       SessionCheck.Evaluate
+                       SessionCheck.Evaluate,
+                       SessionCheck.Predicate,
+                       SessionCheck
   build-depends:       base >= 4.7 && < 5,
                        erlang >= 0.2.2 && < 0.3,
                        mtl >= 2.2.1 && < 2.3,

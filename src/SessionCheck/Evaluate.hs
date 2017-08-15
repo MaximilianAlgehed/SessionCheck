@@ -9,21 +9,21 @@ import Data.Maybe
 import SessionCheck.Types
 import SessionCheck.Classes
 
-data Status t = SSend t
+data Status t = Sent t
+              | Got  t
               | Done
               | Skip
               | Step
-              | Timeout
               | Bad String
               | Amb String
               deriving (Ord, Eq)
 
 instance Show t => Show (Status t) where
-  show (SSend t) = "Send: " ++ show t
+  show (Sent t) = "Sent: " ++ show t
+  show (Got t)  = "Got: " ++ show t
   show Done     = "Done"
   show Skip     = "Skip"
   show Step     = "Step"
-  show Timeout  = "Timeout"
   show (Bad e)  = "Bad: " ++ e
   show (Amb e)  = "Ambiguity: " ++ e
 
@@ -31,7 +31,6 @@ isError :: Status t -> Bool
 isError s = case s of
   Bad _   -> True
   Amb _   -> True
-  Timeout -> True
   _       -> False
 
 isSkip :: Status t -> Bool
@@ -41,7 +40,7 @@ isSkip s = case s of
 
 maybeSend :: Status t -> TChan t -> IO ()
 maybeSend st wc = case st of
-  SSend t -> atomically $ writeTChan wc t
+  Sent t -> atomically $ writeTChan wc t
   _       -> return ()
 
 data Trace t where
@@ -94,30 +93,29 @@ eval imp fuel trs = do
     maybeSend st (outputChan imp)
     eval imp fuel' trs'
 
+-- Make the insertion of the new threads in the schedule non-deterministic
+  -- in order to test for bugs that only work in a round-robin schedule.
 step :: Implementation t -> [Trace t] -> IO ([Trace t], Status t)
 step _ [] = return ([], Done)
 step imp trs@((Hide s c):ts) = case s of
   Get p    -> do
-    mt <- atomically $ tryPeekTChan (inputChan imp)
-    case mt of
-      Nothing -> return (trs, Skip)
-      Just i  ->
-        if test p i then
-          if any (traceAccepts i) ts then
-            return (trs, Amb $ "get " ++ name p) -- TODO better error here
-          else do
-            atomically $ readTChan (inputChan imp)
-            return (ts ++ [hide $ c (fromJust (prj i))], Step)
-        else
-          return (ts ++ [Hide s c], Skip) 
+    i <- atomically $ peekTChan (inputChan imp)
+    if test p i then
+      if any (traceAccepts i) ts then
+        return (trs, Amb $ "get " ++ name p) -- TODO better error here
+      else do
+        atomically $ readTChan (inputChan imp)
+        return (ts ++ [hide $ c (fromJust (prj i))], Got i)
+    else
+      return (ts ++ [Hide s c], Skip) 
 
   Send p   -> do
     a <- generate (satisfies p)
     if any (traceProduces (inj a)) ts then
       return (trs, Amb $ "send " ++ name p) -- TODO better error here
     else
-      return (ts ++ [hide (c a)], SSend (inj a))
-
+      return (ts ++ [hide (c a)], Sent (inj a))
+  
   Fork t   -> return (ts ++ [hide t, hide (c ())], Step)
 
   Stop     -> return (ts, Done)
