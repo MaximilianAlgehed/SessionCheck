@@ -10,6 +10,7 @@ import SessionCheck.Spec
 import SessionCheck.Classes
 import SessionCheck.Predicate
 
+-- The status of taking a single step in the execution of a protocol
 data Status t = Sent t
               | Got  t
               | Done
@@ -28,17 +29,20 @@ instance Show t => Show (Status t) where
   show (Bad e)  = "Bad: " ++ e
   show (Amb e)  = "Ambiguity: " ++ e
 
+-- Check if a status represents an error
 isError :: Status t -> Bool
 isError s = case s of
   Bad _   -> True
   Amb _   -> True
   _       -> False
 
+-- Check if a status is a `Skip`
 isSkip :: Status t -> Bool
 isSkip s = case s of
   Skip -> True
   _    -> False
 
+-- Send a value on a `TChan` if the status is a `Sent`
 maybeSend :: Status t -> TChan t -> IO ()
 maybeSend st wc = case st of
   Sent t -> atomically $ writeTChan wc t
