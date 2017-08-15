@@ -89,11 +89,12 @@ traceAccepts t (Hide s _) = accepts s t
 traceProduces :: t -> Trace t -> Bool
 traceProduces t (Hide s _) = canProduce s t
 
-evaluate :: Show t => Implementation t -> Spec t a -> IO ()
+-- TODO: Change this to return counterexample if found
+evaluate :: Show t => Implementation t -> Spec t a -> IO (Status t)
 evaluate imp s = do
   s  <- eval imp 1 [hide s]
   kill imp 
-  print s
+  return s
 
 -- TODO: Use error monad transformer instead perhaps?
 eval :: Show t => Implementation t -> Int -> [Trace t] -> IO (Status t)
