@@ -18,7 +18,7 @@ test p t = maybe False id (apply p <$> prj t)
 data Spec t a where
   Get   :: a :< t => Predicate a -> Spec t a
   Send  :: a :< t => Predicate a -> Spec t a
-  Both  :: Spec t a -> Spec t b  -> Spec t ()
+  Fork  :: Spec t a -> Spec t ()
   Stop  :: Spec t a
   -- Monadic fragment
   Return :: a -> Spec t a
@@ -41,8 +41,11 @@ get = Get
 send :: a :< t => Predicate a -> Spec t a
 send = Send
 
+fork :: Spec t a -> Spec t ()
+fork = Fork
+
 (//) :: Spec t a -> Spec t b -> Spec t ()
-l // r = Both l r
+l // r = fork l >> r >> return ()
 
 stop :: Spec t a
 stop = Stop
@@ -51,7 +54,7 @@ dual :: Spec t a -> Spec t a
 dual s = case s of
   Get p    -> Send p
   Send p   -> Get p
-  Both l r -> Both l r
+  Fork s   -> Fork (dual s)
   Stop     -> Stop
   Return a -> Return a
   Bind s f -> Bind (dual s) (dual . f)
