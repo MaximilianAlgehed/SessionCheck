@@ -95,6 +95,7 @@ evaluate imp s = do
   kill imp 
   print s
 
+-- TODO: Use error monad transformer instead perhaps?
 eval :: Show t => Implementation t -> Int -> [Trace t] -> IO (Status t)
 eval _  _ [] = return Done -- We are finished
 eval _  0 _  = return (Bad $ "no progress") -- No thread made any progress
