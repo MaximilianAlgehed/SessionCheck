@@ -82,19 +82,21 @@ evaluate imp s = do
   print s
 
 eval :: Show t => Implementation t -> Int -> [Trace t] -> IO (Status t)
-eval _  _ [] = return Done
-eval _  0 _  = return (Bad $ "no progress")
+eval _  _ [] = return Done -- We are finished
+eval _  0 _  = return (Bad $ "no progress") -- No thread made any progress
 eval imp fuel trs = do
   (trs', st) <- step imp trs
   let fuel' = if isSkip st then fuel - 1 else length trs'
-  if isError st then
+  if isError st then -- The protocol test failed
     return st
   else do
+    -- If the result of the step was a send, send that message
     maybeSend st (outputChan imp)
+    -- Ensure that the scheduling is not round robing
+    trs' <- generate (shuffle trs') 
+    -- Loop
     eval imp fuel' trs'
 
--- Make the insertion of the new threads in the schedule non-deterministic
-  -- in order to test for bugs that only work in a round-robin schedule.
 step :: Implementation t -> [Trace t] -> IO ([Trace t], Status t)
 step _ [] = return ([], Done)
 step imp trs@((Hide s c):ts) = case s of
