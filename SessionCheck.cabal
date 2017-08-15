@@ -15,7 +15,7 @@ cabal-version:       >=1.10
 
 library
   hs-source-dirs:      src
-  exposed-modules:     SessionCheck.Types,
+  exposed-modules:     SessionCheck.Spec,
                        SessionCheck.Classes,
                        SessionCheck.Evaluate,
                        SessionCheck.Predicate,

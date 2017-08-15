@@ -32,4 +32,3 @@ anyDouble = anything { name = "anyDouble" }
 -- Accepts any `Dobule`
 anyBool :: Predicate Int
 anyBool = anything { name = "anyBool" }
-
