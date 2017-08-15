@@ -59,12 +59,6 @@ maybeSend st imp = case st of
       return st
   _      -> return Skip
 
-data Thread t where
-  Hide :: Spec t a -> (a -> Spec t b) -> Thread t
-
-hide :: Spec t a -> Thread t
-hide s = Hide s (\_-> Stop)
-
 -- Check if a specification can accept a message
 accepts :: Spec t a -> t -> Bool
 accepts tr t = case tr of

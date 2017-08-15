@@ -57,3 +57,11 @@ dual s = case s of
   Stop     -> Stop
   Return a -> Return a
   Bind s f -> Bind (dual s) (dual . f)
+
+-- Representation of threads which hide the intermediate types
+data Thread t where
+  Hide :: Spec t a -> (a -> Spec t b) -> Thread t
+
+-- Simply hide a Spec
+hide :: Spec t a -> Thread t
+hide s = Hide s (\_-> Stop)
