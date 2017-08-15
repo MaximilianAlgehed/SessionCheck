@@ -72,6 +72,8 @@ data Implementation t = CC { outputChan :: Chan t
                            , inputChan  :: Chan t
                            , kill       :: IO () }
 
+-- Rewrite this to use the channels directly instead of the lazy list as the
+-- lazy list will block on stepping `Get`
 evaluate :: Show t => Implementation t -> Spec t a -> IO ()
 evaluate cc s = do
   ts <- getChanContents (inputChan cc) 
@@ -95,6 +97,7 @@ step :: [t] -> [Trace t] -> IO ([t], [Trace t], Status t)
 step ins [] = return (ins, [], Done)
 step ins trs@((Hide s c):ts) = case s of
   Get p    ->
+    -- Add timeout here when we change to use the chan directly
     case ins of
       []     -> return (ins, trs, Bad $ "Ran out of inputs at: get " ++ name p)
       (i:is) ->
