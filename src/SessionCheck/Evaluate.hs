@@ -8,6 +8,7 @@ import Data.Maybe
 
 import SessionCheck.Types
 import SessionCheck.Classes
+import SessionCheck.Predicate
 
 data Status t = Sent t
               | Got  t

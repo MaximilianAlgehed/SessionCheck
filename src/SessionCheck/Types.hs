@@ -2,15 +2,9 @@
 module SessionCheck.Types where
 
 import Control.Monad
-import Test.QuickCheck
 
 import SessionCheck.Classes
-
-data Predicate a =
-  Predicate { apply     :: a -> Bool
-            , satisfies :: Gen a
-            , name      :: String
-            }
+import SessionCheck.Predicate
 
 test :: a :< t => Predicate a -> t -> Bool
 test p t = maybe False id (apply p <$> prj t)
