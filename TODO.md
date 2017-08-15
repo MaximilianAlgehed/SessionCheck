@@ -1,7 +1,10 @@
 # TODO
 
-* Think about the need for synchronization
+* Implement displaying the list of sent and gotten messages after a
+  counterexample is found
+* Implement shrinking
 * Implement the `Erlang` interface.
 * Port some examples from the old implementation.
-* Update the report to not mention state but rather use the state monad
-  transformer.
+* Think about the need for synchronization between "threads"
+* Think about the need for communicating results between "threads"
+* Update the report to not mention state

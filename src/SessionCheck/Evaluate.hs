@@ -65,9 +65,11 @@ canProduce tr t = case tr of
   Bind tr _ -> canProduce tr t
   _         -> False
 
+-- Lift `accepts` to a `Trace`
 traceAccepts :: t -> Trace t -> Bool
 traceAccepts t (Hide s _) = accepts s t
 
+-- Lift `canProduce` to a `Trace`
 traceProduces :: t -> Trace t -> Bool
 traceProduces t (Hide s _) = canProduce s t
 
