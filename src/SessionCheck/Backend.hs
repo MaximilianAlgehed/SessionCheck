@@ -6,12 +6,14 @@ import Control.Monad
 import System.Timeout
 import Data.IORef
 
-data Implementation t = CC { outputChan :: TChan t
-                           , inputChan  :: TChan t
-                           , dead       :: IORef Bool }
+data Implementation t = Imp { outputChan :: TChan t
+                            , inputChan  :: TChan t
+                            , dead       :: IORef Bool
+                            , run        :: IO () }
 
 changeDirection :: Implementation t -> Implementation t
-changeDirection cc = cc { outputChan = inputChan cc, inputChan = outputChan cc }
+changeDirection imp = imp { outputChan = inputChan imp
+                          , inputChan  = outputChan imp }
 
 peek :: Implementation t -> IO (Maybe t)
 peek imp = do

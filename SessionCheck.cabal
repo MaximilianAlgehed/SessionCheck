@@ -20,6 +20,7 @@ library
                        SessionCheck.Evaluate,
                        SessionCheck.Predicate,
                        SessionCheck.Backend,
+                       SessionCheck.Backend.Erlang,
                        SessionCheck
   build-depends:       base >= 4.7 && < 5,
                        erlang >= 0.2.2 && < 0.3,
