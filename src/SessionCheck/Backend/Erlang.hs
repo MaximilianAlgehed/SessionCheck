@@ -2,11 +2,15 @@ module SessionCheck.Backend.Erlang where
 
 import Foreign.Erlang
 import Control.Concurrent.STM
+import Control.Concurrent
 import Control.Monad
 import Data.IORef
 import System.Timeout
+import System.Process
 
 import SessionCheck.Backend
+import SessionCheck.Spec
+import SessionCheck.Test
 
 data Options =
   Options { targetModule   :: String
@@ -63,3 +67,28 @@ runFun readChan writeChan dead opts = do
               (\m -> atomically $ writeTChan writeChan m)
               fromErlang
         loop mbox
+
+erlangMain :: String -- ^ On the form "moduleName:functionName"
+           -> Spec ErlType a -- ^ The specification
+           -> IO ()
+erlangMain modfun spec = do
+  let mod = takeWhile (/= ':') modfun
+      fun = tail $ dropWhile (/= ':') modfun
+  ph <- spawnCommand "erl -sname erl > /dev/null"
+  threadDelay 2000000
+  options <- newSession mod fun "erl"
+  imp <- erlang options
+  sessionCheck imp spec 
+  killErlangNode "erl"
+
+-- Kill an erlang node
+killErlangNode :: String -> IO ()
+killErlangNode name = do
+  port <- readCreateProcess
+    (shell $ "epmd -names | awk -v name=" ++ name ++ " '$2==name {print $5}'")
+    ""
+  pid <- readCreateProcess
+    (shell $ "lsof -i TCP:" ++ port
+           ++ " -s TCP:LISTEN | tail -n +2 | awk '{print $2}'")
+    ""
+  void $ createProcess (shell $ "kill " ++ pid) 
