@@ -1,11 +1,13 @@
 module SessionCheck.Test where
 
+import Control.Concurrent
+
 import SessionCheck.Spec
 import SessionCheck.Backend
 import SessionCheck.Evaluate
 
-test :: Show t => Implementation t -> Spec t a -> IO ()
-test imp spec = do
+sessionCheck :: Show t => Implementation t -> Spec t a -> IO ()
+sessionCheck imp spec = do
   loop 100
   where
     loop 0 = print "OK"
