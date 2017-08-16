@@ -1,5 +1,6 @@
 # TODO
 
+* Implement test function which tests multiple times
 * Port Erlang examples from the old implementation 
 * Implement displaying the list of sent and gotten messages after a
   counterexample is found
