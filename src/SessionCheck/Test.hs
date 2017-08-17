@@ -15,8 +15,9 @@ sessionCheck imp spec = do
       putStr "."
       reset imp
       forkIO $ run imp
-      status <- evaluate imp spec
-      if isError status then
+      (status, l) <- evaluate imp spec
+      if isError status then do
         putStrLn $ "\nFailed with:\n" ++ show status
+        putStrLn $ "\nWith trace:\n" ++ printTrace l ++ "\n"
       else
         loop (n-1)

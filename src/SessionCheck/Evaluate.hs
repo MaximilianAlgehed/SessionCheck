@@ -3,6 +3,7 @@ module SessionCheck.Evaluate where
 
 import Control.Concurrent.STM.TChan
 import Control.Concurrent.STM
+import Control.Monad.Writer
 import Test.QuickCheck
 import Data.Maybe
 import Data.IORef
@@ -17,21 +18,22 @@ data Status t = Sent t
               | Got  t
               | Done
               | Skip
+              | GotBad String t
               | Step
               | Bad String
               | Amb String
               | Timeout
-              deriving (Ord, Eq)
 
 instance Show t => Show (Status t) where
-  show (Sent t) = "Sent: " ++ show t
-  show (Got t)  = "Got: " ++ show t
-  show Done     = "Done"
-  show Skip     = "Skip"
-  show Step     = "Step"
-  show (Bad e)  = "Bad: " ++ e
-  show (Amb e)  = "Ambiguity: " ++ e
-  show Timeout  = "Timeout"
+  show (Sent t)     = "Sent: " ++ show t
+  show (Got t)      = "Got: " ++ show t
+  show (GotBad p t) = "GotBad: " ++ p ++ " " ++ show t
+  show Done         = "Done"
+  show Skip         = "Skip"
+  show Step         = "Step"
+  show (Bad e)      = "Bad: " ++ e
+  show (Amb e)      = "Ambiguity: " ++ e
+  show Timeout      = "Timeout"
 
 -- Check if a status represents an error
 isError :: Status t -> Bool
@@ -45,6 +47,7 @@ isError s = case s of
 isSkip :: Status t -> Bool
 isSkip s = case s of
   Skip -> True
+  GotBad _ t -> True
   _    -> False
 
 -- Send a value on a `TChan` if the status is a `Sent`
@@ -83,30 +86,52 @@ traceAccepts t (Hide s _) = accepts s t
 traceProduces :: t -> Thread t -> Bool
 traceProduces t (Hide s _) = canProduce s t
 
+data LogEntry t = Input t
+                | InputViolates String t
+                | Output t deriving (Ord, Eq, Show)
+
+maybeLog :: Monad m => Status t -> Int -> WriterT [LogEntry t] m ()
+maybeLog s f = case s of
+  Got t  -> tell [Input t]
+  Sent t -> tell [Output t]
+  GotBad p t -> if f == 0 then tell [InputViolates p t] else return ()
+  _      -> return ()
+
+printTrace :: Show t => [LogEntry t] -> String
+printTrace = unlines . map show
+
 -- TODO: Change this to return counterexample if found
-evaluate :: Show t => Implementation t -> Spec t a -> IO (Status t)
+evaluate :: Show t
+         => Implementation t
+         -> Spec t a
+         -> IO (Status t, [LogEntry t])
 evaluate imp s = do
-  s <- eval imp 1 [hide s]
+  (s, w) <- runWriterT $ eval imp 1 [hide s]
   kill imp
-  return s
+  return (s, w)
 
 -- TODO:
 --  *Use error monad transformer instead perhaps?
 --  *Use writer monad transformer to track send and get messages
-eval :: Show t => Implementation t -> Int -> [Thread t] -> IO (Status t)
-eval _  _ [] = return Done -- We are finished
-eval _  0 _  = return (Bad $ "no progress") -- No thread made any progress
+eval :: Show t
+     => Implementation t
+     -> Int
+     -> [Thread t]
+     -> WriterT [LogEntry t] IO (Status t)
+eval _ _ [] = return Done -- We are finished
+eval _ 0 _  = return (Bad $ "no progress") -- No thread made any progress
 eval imp fuel trs = do
-  (trs', st) <- step imp trs
+  (trs', st) <- liftIO $ step imp trs
   let fuel' = if isSkip st then fuel - 1 else length trs'
+  maybeLog st fuel'
   if isError st then -- The protocol test failed
     return st
   else do
     -- If the result of the step was a send, send that message
-    st <- maybeSend st imp
+    st <- liftIO $ maybeSend st imp
     if not (isError st) then
       do -- Ensure that the scheduling is not round robing
-         trs' <- generate (shuffle trs') 
+         trs' <- liftIO $ generate (shuffle trs') 
          -- Loop
          eval imp fuel' trs'
     else
@@ -127,7 +152,7 @@ step imp trs@((Hide s c):ts) = case s of
                      pop imp
                      return (ts ++ [hide $ c (fromJust (prj i))], Got i)
                  else
-                   return (ts ++ [Hide s c], Skip) 
+                   return (ts ++ [Hide s c], GotBad (name p) i)
 
   Send p   -> do
     a <- generate (satisfies p)

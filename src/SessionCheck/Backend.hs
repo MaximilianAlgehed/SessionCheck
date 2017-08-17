@@ -29,7 +29,16 @@ kill imp = do
   atomicWriteIORef (dead imp) True
   takeMVar (done imp)
 
+clearTChan :: TChan t -> IO ()
+clearTChan tc = do
+  done <- atomically $ isEmptyTChan tc
+  unless done $ do
+     atomically $ readTChan tc
+     clearTChan tc
+
 reset :: Implementation t -> IO ()
 reset imp = do
   writeIORef (dead imp) False
-  void $ tryTakeMVar (done imp)
+  tryTakeMVar (done imp)
+  clearTChan (outputChan imp)
+  clearTChan (inputChan imp)

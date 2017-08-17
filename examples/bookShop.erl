@@ -16,7 +16,7 @@ loop(XS) ->
 
 continue(I, XS) ->
   Lst = if
-          %I < 0 -> XS;
+          I < 0 -> XS;
           %length(XS) >= 5 -> XS;
           true  -> [I|XS]
         end,
