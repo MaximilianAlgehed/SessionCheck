@@ -1,4 +1,5 @@
-module SessionCheck.Backend.Erlang where
+module SessionCheck.Backend.Erlang ( erlangMain
+                                   , ErlType )where
 
 import Foreign.Erlang
 import Control.Concurrent.STM

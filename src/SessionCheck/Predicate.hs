@@ -2,6 +2,7 @@
 module SessionCheck.Predicate where
 
 import Test.QuickCheck
+import Data.List
 
 import SessionCheck.Classes
 
@@ -32,3 +33,14 @@ anyDouble = anything { name = "anyDouble" }
 -- Accepts any `Dobule`
 anyBool :: Predicate Int
 anyBool = anything { name = "anyBool" }
+
+-- Accepts any member of `as`
+choiceOf :: (Eq a, Show a) => [a] -> Predicate a
+choiceOf as = Predicate { apply     = flip elem as
+                        , satisfies = elements as 
+                        , name      = "choiceOf " ++ show as }
+
+permutationOf :: (Eq a, Show a) => [a] -> Predicate [a]
+permutationOf as = Predicate { apply     = \as' -> elem as' (permutations as)
+                             , satisfies = shuffle as
+                             , name      = "permutationOf " ++ show as }

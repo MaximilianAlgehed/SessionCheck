@@ -65,3 +65,13 @@ data Thread t where
 -- Simply hide a Spec
 hide :: Spec t a -> Thread t
 hide s = Hide s (\_-> Stop)
+
+------- Derived combinators for constructing specifications -------
+
+-- Make a choice of one of the elements in the list
+choose :: (Eq a, Show a, a :< b) => [a] -> Spec b a
+choose = send . choiceOf 
+
+-- The other party makes a choice of one of the elements in the list
+branch :: (Eq a, Show a, a :< b) => [a] -> Spec b a
+branch = dual . choose
