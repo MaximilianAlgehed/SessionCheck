@@ -90,7 +90,9 @@ evaluate imp s = do
   kill imp
   return s
 
--- TODO: Use error monad transformer instead perhaps?
+-- TODO:
+--  *Use error monad transformer instead perhaps?
+--  *Use writer monad transformer to track send and get messages
 eval :: Show t => Implementation t -> Int -> [Thread t] -> IO (Status t)
 eval _  _ [] = return Done -- We are finished
 eval _  0 _  = return (Bad $ "no progress") -- No thread made any progress
