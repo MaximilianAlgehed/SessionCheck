@@ -10,11 +10,13 @@ sessionCheck :: Show t => Implementation t -> Spec t a -> IO ()
 sessionCheck imp spec = do
   loop 100
   where
-    loop 0 = print "OK"
+    loop 0 = putStrLn "\nOK"
     loop n = do
+      putStr "."
+      reset imp
       forkIO $ run imp
       status <- evaluate imp spec
       if isError status then
-        print status
+        putStrLn $ "\nFailed with:\n" ++ show status
       else
         loop (n-1)

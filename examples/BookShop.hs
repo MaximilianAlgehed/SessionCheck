@@ -5,7 +5,7 @@ import SessionCheck.Backend.Erlang
 
 bookShop :: [Int] -> Spec ErlType ()
 bookShop books = do 
-  b <- send anything 
+  b <- send anyInt
   let books' = b : books
 
   choice <- choose ["another", "request"]
@@ -21,3 +21,6 @@ request books = do
   case choice of
     "another" -> bookShop books
     "done"    -> stop
+
+main :: IO ()
+main = erlangMain "bookShop:main" (bookShop [])

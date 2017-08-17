@@ -1,7 +1,9 @@
 module SessionCheck.Backend.Erlang.Main ( erlangMain )where
+
 import Foreign.Erlang
 import Control.Concurrent.STM
 import Control.Concurrent
+import Control.Concurrent.MVar
 import Control.Monad
 import Data.IORef
 import System.Timeout
@@ -32,25 +34,37 @@ erlang opts = do
   readChan  <- atomically $ newTChan
   writeChan <- atomically $ newTChan
   isDead    <- newIORef False
+  isDone    <- newEmptyMVar 
   return $ Imp { outputChan = readChan
                , inputChan  = writeChan
                , dead       = isDead 
-               , run        = runFun readChan writeChan isDead opts }
+               , run        = runFun readChan writeChan isDead isDone opts
+               , done       = isDone }
 
 runFun :: TChan ErlType
        -> TChan ErlType 
        -> IORef Bool
+       -> MVar ()
        -> Options
        -> IO ()
-runFun readChan writeChan dead opts = do
+runFun readChan writeChan dead done opts = do
   mbox <- createMBox (self opts)
   rpcCall mbox (Short erl) (targetModule opts) (targetFunction opts) []
   mboxSend mbox (Short erl) (Right "p") (mboxSelf mbox)
+  tid <- forkIO $ erlLoop mbox
   loop mbox
+  killThread tid
   pid <- rpcCall mbox (Short erl) "erlang" "whereis" [ErlAtom "p"]
   void $ rpcCall mbox (Short erl) "erlang" "exit" [pid, ErlAtom "ok"] 
+  putMVar done ()
   where
+    
     erl = erlangNode opts
+    erlLoop mbox = do
+      m <- mboxRecv mbox
+      atomically $ writeTChan writeChan m
+      erlLoop mbox
+
     loop mbox = do
       d <- readIORef dead
       unless d $ do
@@ -61,10 +75,6 @@ runFun readChan writeChan dead opts = do
                              (Right "p")
                              (mboxSelf mbox, m)) 
               toErlang
-        fromErlang <- timeout 1000 $ mboxRecv mbox
-        maybe (return ())
-              (\m -> atomically $ writeTChan writeChan m)
-              fromErlang
         loop mbox
 
 erlangMain :: String -- ^ On the form "moduleName:functionName"
@@ -83,9 +93,10 @@ erlangMain modfun spec = do
 -- Kill an erlang node
 killErlangNode :: String -> IO ()
 killErlangNode name = do
-  port <- readCreateProcess
+  p <- readCreateProcess
     (shell $ "epmd -names | awk -v name=" ++ name ++ " '$2==name {print $5}'")
     ""
+  let port = filter (/='\n') p
   pid <- readCreateProcess
     (shell $ "lsof -i TCP:" ++ port
            ++ " -s TCP:LISTEN | tail -n +2 | awk '{print $2}'")

@@ -86,8 +86,8 @@ traceProduces t (Hide s _) = canProduce s t
 -- TODO: Change this to return counterexample if found
 evaluate :: Show t => Implementation t -> Spec t a -> IO (Status t)
 evaluate imp s = do
-  s  <- eval imp 1 [hide s]
-  kill imp 
+  s <- eval imp 1 [hide s]
+  kill imp
   return s
 
 -- TODO: Use error monad transformer instead perhaps?
@@ -102,7 +102,7 @@ eval imp fuel trs = do
   else do
     -- If the result of the step was a send, send that message
     st <- maybeSend st imp
-    if isError st then
+    if not (isError st) then
       do -- Ensure that the scheduling is not round robing
          trs' <- generate (shuffle trs') 
          -- Loop
