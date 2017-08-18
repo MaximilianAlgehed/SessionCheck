@@ -4,11 +4,14 @@ module SessionCheck.Evaluate where
 import Control.Concurrent.STM.TChan
 import Control.Concurrent.STM
 import Control.Monad.Writer
+import Control.Monad.Except
+import Control.Monad.Reader
+import Control.Monad.State
 import Test.QuickCheck
 import Data.Maybe
 import Data.IORef
 
-import SessionCheck.Spec
+import SessionCheck.Spec hiding (get)
 import SessionCheck.Classes
 import SessionCheck.Predicate
 import SessionCheck.Backend
@@ -43,25 +46,6 @@ isError s = case s of
   Timeout -> True
   _       -> False
 
--- Check if a status is a `Skip`
-isSkip :: Status t -> Bool
-isSkip s = case s of
-  Skip -> True
-  GotBad _ t -> True
-  _    -> False
-
--- Send a value on a `TChan` if the status is a `Sent`
-maybeSend :: Status t -> Implementation t -> IO (Status t)
-maybeSend st imp = case st of
-  Sent t -> do
-    d <- readIORef (dead imp)
-    if d then
-      return Timeout
-    else do
-      atomically $ writeTChan (outputChan imp) t
-      return st
-  _      -> return Skip
-
 -- Check if a specification can accept a message
 accepts :: Spec t a -> t -> Bool
 accepts tr t = case tr of
@@ -90,81 +74,124 @@ data LogEntry t = Input t
                 | InputViolates String t
                 | Output t deriving (Ord, Eq, Show)
 
-maybeLog :: Monad m => Status t -> Int -> WriterT [LogEntry t] m ()
-maybeLog s f = case s of
+maybeLog :: Status t -> EvalM t ()
+maybeLog s = case s of
   Got t  -> tell [Input t]
   Sent t -> tell [Output t]
-  GotBad p t -> if f == 0 then tell [InputViolates p t] else return ()
   _      -> return ()
 
 printTrace :: Show t => [LogEntry t] -> String
 printTrace = unlines . map show
 
--- TODO: Change this to return counterexample if found
 evaluate :: Show t
          => Implementation t
          -> Spec t a
-         -> IO (Status t, [LogEntry t])
+         -> IO (Either (Status t) (), [LogEntry t])
 evaluate imp s = do
-  (s, w) <- runWriterT $ eval imp 1 [hide s]
+  (s, w) <- runEvalM s imp eval
   kill imp
   return (s, w)
 
--- TODO:
---  *Use error monad transformer instead perhaps?
---  *Use writer monad transformer to track send and get messages
-eval :: Show t
-     => Implementation t
-     -> Int
-     -> [Thread t]
-     -> WriterT [LogEntry t] IO (Status t)
-eval _ _ [] = return Done -- We are finished
-eval _ 0 _  = return (Bad $ "no progress") -- No thread made any progress
-eval imp fuel trs = do
-  (trs', st) <- liftIO $ step imp trs
-  let fuel' = if isSkip st then fuel - 1 else length trs'
-  maybeLog st fuel'
-  if isError st then -- The protocol test failed
-    return st
-  else do
-    -- If the result of the step was a send, send that message
-    st <- liftIO $ maybeSend st imp
-    if not (isError st) then
-      do -- Ensure that the scheduling is not round robing
-         trs' <- liftIO $ generate (shuffle trs') 
-         -- Loop
-         eval imp fuel' trs'
-    else
-      return st
+runEvalM :: Spec t a
+         -> Implementation t
+         -> EvalM t b
+         -> IO (Either (Status t) b, [LogEntry t])
+runEvalM s imp = runWriterT .
+                 runExceptT .
+                 flip runReaderT imp .
+                 flip evalStateT (SS [] [hide s])
+
+data SchedulerState t = SS { getting     :: [Thread t]
+                           , progressing :: [Thread t] }
+
+empty :: SchedulerState t -> Bool
+empty ss = null (getting ss) && null (progressing ss)
+
+type EvalM t a = StateT (SchedulerState t)
+                  (ReaderT (Implementation t)
+                    (ExceptT (Status t)
+                      (WriterT [LogEntry t] IO))) a
+
+scheduleThread :: Thread t -> EvalM t ()
+scheduleThread t@(Hide s _) =
+  modify $ \ss -> case s of
+    Get _ -> ss { getting     = t : getting ss }
+    _     -> ss { progressing = t : progressing ss}
+
+wakeThread :: EvalM t (Thread t)
+wakeThread = do
+  ss <- get
+  when (empty ss) (throwError $ Timeout)
+  prg <- liftIO $ generate arbitrary
+  if (not . null $ progressing ss) && ((null $ getting ss) || prg) then
+    wakeProgressing
+  else
+    wakeGetting
+  where
+    wakeGetting = do
+      ss <- get
+      g' <- liftIO $ generate $ shuffle (getting ss)
+      modify $ \ss -> ss { getting = tail g' }
+      return (head g')
+    wakeProgressing = do
+      ss <- get
+      p' <- liftIO $ generate $ shuffle (progressing ss)
+      modify $ \ss -> ss { progressing = tail p' }
+      return (head p')
+
+eval :: EvalM t ()
+eval = do
+  e <- gets empty 
+  unless e $ do
+    step
+    eval
 
 -- Take a single step in evaluating the current set of threads
-step :: Implementation t -> [Thread t] -> IO ([Thread t], Status t)
-step _ [] = return ([], Done)
-step imp trs@((Hide s c):ts) = case s of
-  Get p    -> do
-    mi <- peek imp
-    case mi of
-      Nothing -> return (trs, Timeout)
-      Just i  -> if test p i then
-                   if any (traceAccepts i) ts then
-                     return (trs, Amb $ "get " ++ name p)
-                   else do
-                     pop imp
-                     return (ts ++ [hide $ c (fromJust (prj i))], Got i)
-                 else
-                   return (ts ++ [Hide s c], GotBad (name p) i)
+step :: EvalM t ()
+step = do
+  t   <- wakeThread
+  stepThread t
+  where
+  stepThread (Hide s c) = do
+    imp <- ask
+    case s of
+      Get p    -> do
+        mi <- liftIO $ peek imp
+        ts <- gets getting
+        case mi of
+          Nothing -> throwError Timeout 
+          Just i  -> if test p i then
+                       if any (traceAccepts i) ts then
+                         throwError (Amb $ "get " ++ name p)
+                       else do
+                         liftIO $ pop imp
+                         scheduleThread (hide $ c (fromJust (prj i)))
+                         tell [Input i]
+                     else do
+                       unless (any (traceAccepts i) ts) $ do
+                         tell [InputViolates (name p) i]
+                         throwError (Bad $ "get " ++ name p)
+                       scheduleThread (Hide s c)
 
-  Send p   -> do
-    a <- generate (satisfies p)
-    if any (traceProduces (inj a)) ts then
-      return (trs, Amb $ "send " ++ name p) -- TODO better error here
-    else
-      return (ts ++ [hide (c a)], Sent (inj a))
-  
-  Fork t   -> return (ts ++ [hide t, hide (c ())], Step)
+      Send p   -> do
+        a <- liftIO $ generate (satisfies p)
+        ts <- gets progressing
+        if any (traceProduces (inj a)) ts then
+          throwError (Amb $ "send " ++ name p) -- TODO better error here
+        else do
+          scheduleThread (hide (c a))
+          d <- liftIO $ readIORef (dead imp)
+          when d (throwError Timeout)
+          void . liftIO . atomically $ writeTChan (outputChan imp) (inj a)
+          tell [Output (inj a)]
+      
+      Fork t   -> do
+        mapM scheduleThread [hide t, hide (c ())]
+        return ()
 
-  Stop     -> return (ts, Done)
-  
-  Return a -> return ((Hide (c a) (\_ -> Stop)):ts, Step)
+      Stop     -> return ()
+      
+      {- Change these two to run to conclusion! -}
+      Return a -> stepThread (Hide (c a) (\_ -> Stop))
 
-  Bind s f -> return ((Hide s (\a -> f a >>= c)):ts, Step)
+      Bind s f -> stepThread (Hide s (\a -> f a >>= c))
