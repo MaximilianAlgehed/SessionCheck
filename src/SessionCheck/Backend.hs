@@ -13,6 +13,14 @@ data Implementation t = Imp { outputChan :: TChan t
                             , done       :: MVar ()
                             , run        :: IO () }
 
+clean :: IO (Implementation t)
+clean = do
+  oc <- atomically $ newTChan 
+  ic <- atomically $ newTChan
+  d  <- newIORef False
+  mv <- newEmptyMVar
+  return $ Imp oc ic d mv (return ())
+
 peek :: Implementation t -> IO (Maybe t)
 peek imp = do
   d <- readIORef (dead imp)

@@ -26,6 +26,24 @@ anything = Predicate { apply     = const True
 anyInt :: Predicate Int
 anyInt = anything { name = "anyInt" }
 
+-- Accepts any positive int
+posInt :: Predicate Int
+posInt = Predicate { apply     = (>0)
+                   , satisfies = fmap ((+1) . abs) arbitrary
+                   , name      = "posInt" }
+
+-- Accepts any negative int
+negInt :: Predicate Int
+negInt = Predicate { apply     = (<0)
+                   , satisfies = fmap (negate . (+1) . abs) arbitrary
+                   , name      = "negInt" }
+
+-- Accepts anything in the range [p, q]
+inRange :: (Ord a, Show a, Arbitrary a) => a -> a ->  Predicate a
+inRange p q = Predicate { apply     = \a -> p <= a && a <= q
+                        , satisfies = arbitrary `suchThat` (apply (inRange p q))
+                        , name      = "inRange " ++ show p ++ " " ++ show q }
+
 -- Accepts any `Double`
 anyDouble :: Predicate Int
 anyDouble = anything { name = "anyDouble" }

@@ -3,7 +3,8 @@ module SessionCheck ( module SessionCheck.Spec
                     , module SessionCheck.Classes
                     , module SessionCheck.Predicate
                     , module SessionCheck.Backend
-                    , module SessionCheck.Test) where
+                    , module SessionCheck.Test
+                    , module SessionCheck.Backend.Coherence) where
 
 import SessionCheck.Spec
 import SessionCheck.Evaluate
@@ -11,3 +12,4 @@ import SessionCheck.Classes
 import SessionCheck.Predicate
 import SessionCheck.Backend
 import SessionCheck.Test
+import SessionCheck.Backend.Coherence

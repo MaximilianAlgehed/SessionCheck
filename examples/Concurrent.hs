@@ -1,9 +1,10 @@
+{-# LANGUAGE TypeOperators, FlexibleContexts #-}
 module Concurrent where
 
 import SessionCheck
 import SessionCheck.Backend.Erlang
 
-protocol :: Spec ErlType Int
+protocol :: Int :< t => Spec t Int
 protocol = do
   fork $ do
     i <- branch [1, (2 :: Int)]
