@@ -40,7 +40,14 @@ choiceOf as = Predicate { apply     = flip elem as
                         , satisfies = elements as 
                         , name      = "choiceOf " ++ show as }
 
+-- Accepts any permuation of `as`
 permutationOf :: (Eq a, Show a) => [a] -> Predicate [a]
 permutationOf as = Predicate { apply     = \as' -> elem as' (permutations as)
                              , satisfies = shuffle as
                              , name      = "permutationOf " ++ show as }
+
+-- Accepts precisely `a`
+is :: (Eq a, Show a) => a -> Predicate a
+is a = Predicate { apply     = (a==)
+                 , satisfies = return a
+                 , name      = "is " ++ show a }

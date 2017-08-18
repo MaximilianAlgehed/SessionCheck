@@ -25,7 +25,7 @@ data Status t = Sent t
               | Step
               | Bad String
               | Amb String
-              | Timeout
+              | Timeout String
 
 instance Show t => Show (Status t) where
   show (Sent t)     = "Sent: " ++ show t
@@ -36,15 +36,15 @@ instance Show t => Show (Status t) where
   show Step         = "Step"
   show (Bad e)      = "Bad: " ++ e
   show (Amb e)      = "Ambiguity: " ++ e
-  show Timeout      = "Timeout"
+  show (Timeout e)  = "Timeout: " ++ e
 
 -- Check if a status represents an error
 isError :: Status t -> Bool
 isError s = case s of
-  Bad _   -> True
-  Amb _   -> True
-  Timeout -> True
-  _       -> False
+  Bad _     -> True
+  Amb _     -> True
+  Timeout _ -> True
+  _         -> False
 
 -- Check if a specification can accept a message
 accepts :: Spec t a -> t -> Bool
@@ -121,7 +121,7 @@ scheduleThread t@(Hide s _) = case s of
 wakeThread :: EvalM t (Thread t)
 wakeThread = do
   ss <- get
-  when (empty ss) (throwError $ Timeout)
+  when (empty ss) (throwError $ Amb "Internal error")
   prg <- liftIO $ generate arbitrary
   if (not . null $ sending ss) && ((null $ getting ss) || prg) then
     wakesending
@@ -160,14 +160,13 @@ stepThread (Hide s c) = do
       mi <- liftIO $ peek imp
       ts <- gets getting
       case mi of
-        Nothing -> throwError Timeout 
-        Just i  -> if test p i then
-                     if any (traceAccepts i) ts then
-                       throwError (Amb $ "get " ++ name p)
-                     else do
-                       liftIO $ pop imp
-                       scheduleThread (hide $ c (fromJust (prj i)))
-                       tell [Input i]
+        Nothing -> throwError $ Timeout $ "get " ++ name p 
+        Just i  -> if test p i then do
+                     tell [Input i]
+                     when (any (traceAccepts i) ts) 
+                          (throwError (Amb $ "get " ++ name p))
+                     liftIO $ pop imp
+                     scheduleThread (hide $ c (fromJust (prj i)))
                    else do
                      unless (any (traceAccepts i) ts) $ do
                        tell [InputViolates (name p) i]
@@ -181,7 +180,7 @@ stepThread (Hide s c) = do
         throwError (Amb $ "send " ++ name p) -- TODO better error here
       else do
         d <- liftIO $ readIORef (dead imp)
-        when d (throwError Timeout)
+        when d (throwError $ Timeout ("send " ++ name p))
         void . liftIO . atomically $ writeTChan (outputChan imp) (inj a)
         tell [Output (inj a)]
         scheduleThread (hide (c a))
