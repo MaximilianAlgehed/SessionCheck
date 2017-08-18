@@ -102,10 +102,10 @@ runEvalM s imp = runWriterT .
                  flip evalStateT (SS [] [hide s])
 
 data SchedulerState t = SS { getting     :: [Thread t]
-                           , progressing :: [Thread t] }
+                           , sending :: [Thread t] }
 
 empty :: SchedulerState t -> Bool
-empty ss = null (getting ss) && null (progressing ss)
+empty ss = null (getting ss) && null (sending ss)
 
 type EvalM t a = StateT (SchedulerState t)
                   (ReaderT (Implementation t)
@@ -113,18 +113,18 @@ type EvalM t a = StateT (SchedulerState t)
                       (WriterT [LogEntry t] IO))) a
 
 scheduleThread :: Thread t -> EvalM t ()
-scheduleThread t@(Hide s _) =
-  modify $ \ss -> case s of
-    Get _ -> ss { getting     = t : getting ss }
-    _     -> ss { progressing = t : progressing ss}
+scheduleThread t@(Hide s _) = case s of
+    Get _  -> modify $ \ss -> ss { getting = t : getting ss }
+    Send _ -> modify $ \ss -> ss { sending = t : sending ss }
+    _      -> stepThread t
 
 wakeThread :: EvalM t (Thread t)
 wakeThread = do
   ss <- get
   when (empty ss) (throwError $ Timeout)
   prg <- liftIO $ generate arbitrary
-  if (not . null $ progressing ss) && ((null $ getting ss) || prg) then
-    wakeProgressing
+  if (not . null $ sending ss) && ((null $ getting ss) || prg) then
+    wakesending
   else
     wakeGetting
   where
@@ -133,10 +133,10 @@ wakeThread = do
       g' <- liftIO $ generate $ shuffle (getting ss)
       modify $ \ss -> ss { getting = tail g' }
       return (head g')
-    wakeProgressing = do
+    wakesending = do
       ss <- get
-      p' <- liftIO $ generate $ shuffle (progressing ss)
-      modify $ \ss -> ss { progressing = tail p' }
+      p' <- liftIO $ generate $ shuffle (sending ss)
+      modify $ \ss -> ss { sending = tail p' }
       return (head p')
 
 eval :: EvalM t ()
@@ -149,49 +149,50 @@ eval = do
 -- Take a single step in evaluating the current set of threads
 step :: EvalM t ()
 step = do
-  t   <- wakeThread
+  t <- wakeThread
   stepThread t
-  where
-  stepThread (Hide s c) = do
-    imp <- ask
-    case s of
-      Get p    -> do
-        mi <- liftIO $ peek imp
-        ts <- gets getting
-        case mi of
-          Nothing -> throwError Timeout 
-          Just i  -> if test p i then
-                       if any (traceAccepts i) ts then
-                         throwError (Amb $ "get " ++ name p)
-                       else do
-                         liftIO $ pop imp
-                         scheduleThread (hide $ c (fromJust (prj i)))
-                         tell [Input i]
+
+stepThread :: Thread t -> EvalM t ()
+stepThread (Hide s c) = do
+  imp <- ask
+  case s of
+    Get p    -> do
+      mi <- liftIO $ peek imp
+      ts <- gets getting
+      case mi of
+        Nothing -> throwError Timeout 
+        Just i  -> if test p i then
+                     if any (traceAccepts i) ts then
+                       throwError (Amb $ "get " ++ name p)
                      else do
-                       unless (any (traceAccepts i) ts) $ do
-                         tell [InputViolates (name p) i]
-                         throwError (Bad $ "get " ++ name p)
-                       scheduleThread (Hide s c)
+                       liftIO $ pop imp
+                       scheduleThread (hide $ c (fromJust (prj i)))
+                       tell [Input i]
+                   else do
+                     unless (any (traceAccepts i) ts) $ do
+                       tell [InputViolates (name p) i]
+                       throwError (Bad $ "get " ++ name p)
+                     scheduleThread (Hide s c)
 
-      Send p   -> do
-        a <- liftIO $ generate (satisfies p)
-        ts <- gets progressing
-        if any (traceProduces (inj a)) ts then
-          throwError (Amb $ "send " ++ name p) -- TODO better error here
-        else do
-          scheduleThread (hide (c a))
-          d <- liftIO $ readIORef (dead imp)
-          when d (throwError Timeout)
-          void . liftIO . atomically $ writeTChan (outputChan imp) (inj a)
-          tell [Output (inj a)]
-      
-      Fork t   -> do
-        mapM scheduleThread [hide t, hide (c ())]
-        return ()
+    Send p   -> do
+      a <- liftIO $ generate (satisfies p)
+      ts <- gets sending
+      if any (traceProduces (inj a)) ts then
+        throwError (Amb $ "send " ++ name p) -- TODO better error here
+      else do
+        d <- liftIO $ readIORef (dead imp)
+        when d (throwError Timeout)
+        void . liftIO . atomically $ writeTChan (outputChan imp) (inj a)
+        tell [Output (inj a)]
+        scheduleThread (hide (c a))
+    
+    Fork t   -> do
+      mapM scheduleThread [hide t, hide (c ())]
+      return ()
 
-      Stop     -> return ()
-      
-      {- Change these two to run to conclusion! -}
-      Return a -> stepThread (Hide (c a) (\_ -> Stop))
+    Stop     -> return ()
+    
+    {- Change these two to run to conclusion! -}
+    Return a -> scheduleThread (Hide (c a) (\_ -> Stop))
 
-      Bind s f -> stepThread (Hide s (\a -> f a >>= c))
+    Bind s f -> scheduleThread (Hide s (\a -> f a >>= c))
