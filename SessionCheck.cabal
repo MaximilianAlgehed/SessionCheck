@@ -21,10 +21,13 @@ library
                        SessionCheck.Predicate,
                        SessionCheck.Backend,
                        SessionCheck.Backend.Erlang,
+                       SessionCheck.Backend.Coherence,
                        SessionCheck.Test,
                        SessionCheck
   other-modules:       SessionCheck.Backend.Erlang.Instances,
-                       SessionCheck.Backend.Erlang.Main
+                       SessionCheck.Backend.Erlang.Main,
+                       SessionCheck.Backend.Coherence.Instances,
+                       SessionCheck.Backend.Coherence.Main
   build-depends:       base >= 4.7 && < 5,
                        erlang >= 0.2.2 && < 0.3,
                        mtl >= 2.2.1 && < 2.3,

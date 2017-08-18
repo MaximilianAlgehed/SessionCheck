@@ -1,9 +1,10 @@
+{-# LANGUAGE TypeOperators, FlexibleContexts #-}
 module BookShop where
 
 import SessionCheck
 import SessionCheck.Backend.Erlang
 
-bookShop :: [Int] -> Spec ErlType ()
+bookShop :: (Int :< t, String :< t, [Int] :< t) => [Int] -> Spec t ()
 bookShop books = do 
   b <- send anyInt
   let books' = b : books
@@ -13,7 +14,7 @@ bookShop books = do
     "another" -> bookShop books'
     "request" -> request books'
             
-request :: [Int] -> Spec ErlType ()
+request :: (Int :< t, String :< t, [Int] :< t) => [Int] -> Spec t ()
 request books = do
   get $ permutationOf books
 

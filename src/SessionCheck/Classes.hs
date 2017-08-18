@@ -1,6 +1,8 @@
 {-# LANGUAGE TypeOperators
            , MultiParamTypeClasses
            , FlexibleInstances
+           , UndecidableInstances
+           , ScopedTypeVariables
 #-}
 module SessionCheck.Classes where
 
