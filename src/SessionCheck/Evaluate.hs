@@ -7,9 +7,10 @@ import Control.Monad.Writer
 import Control.Monad.Except
 import Control.Monad.Reader
 import Control.Monad.State
+import Control.DeepSeq
+import System.Timeout
 import Test.QuickCheck
 import Data.Maybe
-import Data.IORef
 
 import SessionCheck.Spec hiding (get)
 import SessionCheck.Classes
@@ -101,7 +102,7 @@ runEvalM s imp = runWriterT .
                  flip runReaderT imp .
                  flip evalStateT (SS [] [hide s])
 
-data SchedulerState t = SS { getting     :: [Thread t]
+data SchedulerState t = SS { getting :: [Thread t]
                            , sending :: [Thread t] }
 
 empty :: SchedulerState t -> Bool
@@ -112,19 +113,19 @@ type EvalM t a = StateT (SchedulerState t)
                     (ExceptT (Status t)
                       (WriterT [LogEntry t] IO))) a
 
-scheduleThread :: Thread t -> EvalM t ()
+scheduleThread :: Show t => Thread t -> EvalM t ()
 scheduleThread t@(Hide s _) = case s of
     Get _  -> modify $ \ss -> ss { getting = t : getting ss }
     Send _ -> modify $ \ss -> ss { sending = t : sending ss }
     _      -> stepThread t
 
-wakeThread :: EvalM t (Thread t)
+wakeThread :: Show t => EvalM t (Thread t)
 wakeThread = do
   ss <- get
   when (empty ss) (throwError $ Amb "Internal error")
   prg <- liftIO $ generate arbitrary
   if (not . null $ sending ss) && ((null $ getting ss) || prg) then
-    wakesending
+    wakeSending 
   else
     wakeGetting
   where
@@ -133,13 +134,13 @@ wakeThread = do
       g' <- liftIO $ generate $ shuffle (getting ss)
       modify $ \ss -> ss { getting = tail g' }
       return (head g')
-    wakesending = do
+    wakeSending = do
       ss <- get
       p' <- liftIO $ generate $ shuffle (sending ss)
       modify $ \ss -> ss { sending = tail p' }
       return (head p')
 
-eval :: EvalM t ()
+eval :: Show t => EvalM t ()
 eval = do
   e <- gets empty 
   unless e $ do
@@ -147,16 +148,16 @@ eval = do
     eval
 
 -- Take a single step in evaluating the current set of threads
-step :: EvalM t ()
+step :: Show t => EvalM t ()
 step = do
   t <- wakeThread
   stepThread t
 
-stepThread :: Thread t -> EvalM t ()
+stepThread :: Show t => Thread t -> EvalM t ()
 stepThread (Hide s c) = do
   imp <- ask
   case s of
-    Get p    -> do
+    Get p -> do
       mi <- liftIO $ peek imp
       ts <- gets getting
       case mi of
@@ -174,14 +175,15 @@ stepThread (Hide s c) = do
                      scheduleThread (Hide s c)
 
     Send p   -> do
-      a <- liftIO $ generate (satisfies p)
+      a <- generateTimeout p
+      let msg = inj a
       ts <- gets sending
-      if any (traceProduces (inj a)) ts then
+      if any (traceProduces msg) ts then
         throwError (Amb $ "send " ++ name p) -- TODO better error here
       else do
-        d <- liftIO $ readIORef (dead imp)
+        d <- liftIO $ isDead imp
         when d (throwError $ Timeout ("send " ++ name p))
-        void . liftIO . atomically $ writeTChan (outputChan imp) (inj a)
+        void . liftIO . atomically $ writeTChan (outputChan imp) msg
         tell [Output (inj a)]
         scheduleThread (hide (c a))
     
@@ -195,3 +197,12 @@ stepThread (Hide s c) = do
     Return a -> scheduleThread (Hide (c a) (\_ -> Stop))
 
     Bind s f -> scheduleThread (Hide s (\a -> f a >>= c))
+
+generateTimeout :: NFData a => Predicate a -> EvalM t a
+generateTimeout p = do
+  ma <- liftIO $ timeout (10^6) $ do
+    a <- generate (satisfies p)
+    a `deepseq` return a
+  case ma of
+    Nothing -> throwError . Timeout $ "Failed to satisfy: " ++ name p
+    Just a  -> return a

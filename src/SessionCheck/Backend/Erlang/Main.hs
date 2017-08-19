@@ -31,23 +31,13 @@ newSession mod fun node = do
 -- Generate an `Implementation` from the options
 erlang :: Options -> IO (Implementation ErlType)
 erlang opts = do
-  readChan  <- atomically $ newTChan
-  writeChan <- atomically $ newTChan
-  isDead    <- newIORef False
-  isDone    <- newEmptyMVar 
-  return $ Imp { outputChan = readChan
-               , inputChan  = writeChan
-               , dead       = isDead 
-               , run        = runFun readChan writeChan isDead isDone opts
-               , done       = isDone }
+  imp <- clean
+  return $ imp { run = runFun imp opts }
 
-runFun :: TChan ErlType
-       -> TChan ErlType 
-       -> IORef Bool
-       -> MVar ()
+runFun :: Implementation ErlType
        -> Options
        -> IO ()
-runFun readChan writeChan dead done opts = do
+runFun imp@(Imp readChan writeChan _ done _) opts = do
   mbox <- createMBox (self opts)
   rpcCall mbox (Short erl) (targetModule opts) (targetFunction opts) []
   mboxSend mbox (Short erl) (Right "p") (mboxSelf mbox)
@@ -58,7 +48,6 @@ runFun readChan writeChan dead done opts = do
   void $ rpcCall mbox (Short erl) "erlang" "exit" [pid, ErlAtom "ok"] 
   putMVar done ()
   where
-    
     erl = erlangNode opts
     erlLoop mbox = do
       m <- mboxRecv mbox
@@ -66,7 +55,7 @@ runFun readChan writeChan dead done opts = do
       erlLoop mbox
 
     loop mbox = do
-      d <- readIORef dead
+      d <- isDead imp
       unless d $ do
         toErlang <- timeout 1000 $ atomically $ readTChan readChan
         maybe (return ())

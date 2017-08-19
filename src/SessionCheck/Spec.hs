@@ -2,14 +2,15 @@
 module SessionCheck.Spec where
 
 import Control.Monad
+import Control.DeepSeq
 
 import SessionCheck.Classes
 import SessionCheck.Predicate
 
 -- Specifications of protocols
 data Spec t a where
-  Get   :: a :< t => Predicate a -> Spec t a
-  Send  :: a :< t => Predicate a -> Spec t a
+  Get   :: (a :< t, NFData a) => Predicate a -> Spec t a
+  Send  :: (a :< t, NFData a) => Predicate a -> Spec t a
   Fork  :: Spec t a -> Spec t ()
   Stop  :: Spec t a
   -- Monadic fragment
@@ -29,11 +30,11 @@ instance Functor (Spec t) where
   fmap = liftM
 
 -- Recevie a value which satisfies a predicate
-get :: a :< t => Predicate a -> Spec t a
+get :: (a :< t, NFData a) => Predicate a -> Spec t a
 get = Get
 
 -- Send a value which satisfies a predicate
-send :: a :< t => Predicate a -> Spec t a
+send :: (a :< t, NFData a) => Predicate a -> Spec t a
 send = Send
 
 -- Run a protocol in parallel on the same channel
@@ -69,9 +70,9 @@ hide s = Hide s (\_-> Stop)
 ------- Derived combinators for constructing specifications -------
 
 -- Make a choice of one of the elements in the list
-choose :: (Eq a, Show a, a :< b) => [a] -> Spec b a
+choose :: (Eq a, Show a, a :< b, NFData a) => [a] -> Spec b a
 choose = send . choiceOf 
 
 -- The other party makes a choice of one of the elements in the list
-branch :: (Eq a, Show a, a :< b) => [a] -> Spec b a
+branch :: (Eq a, Show a, a :< b, NFData a) => [a] -> Spec b a
 branch = dual . choose

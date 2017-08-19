@@ -5,37 +5,43 @@ import Control.Concurrent.STM
 import Control.Concurrent.MVar
 import Control.Monad
 import System.Timeout
-import Data.IORef
 
 data Implementation t = Imp { outputChan :: TChan t
                             , inputChan  :: TChan t
-                            , dead       :: IORef Bool
+                            , dead       :: MVar ()
                             , done       :: MVar ()
                             , run        :: IO () }
+
+swapDirection :: Implementation t -> Implementation t
+swapDirection imp = imp { outputChan = inputChan imp
+                        , inputChan  = outputChan imp }
 
 clean :: IO (Implementation t)
 clean = do
   oc <- atomically $ newTChan 
   ic <- atomically $ newTChan
-  d  <- newIORef False
+  d  <- newEmptyMVar
   mv <- newEmptyMVar
   return $ Imp oc ic d mv (return ())
 
 peek :: Implementation t -> IO (Maybe t)
 peek imp = do
-  d <- readIORef (dead imp)
+  d <- isDead imp
   if d then
     return Nothing
   else
-    timeout (3*10^6) (atomically . peekTChan . inputChan $ imp)
+    timeout (10^6) (atomically . peekTChan . inputChan $ imp)
 
 pop :: Implementation t -> IO ()
 pop = void . atomically . readTChan . inputChan
 
+isDead :: Implementation t -> IO Bool
+isDead imp = not <$> isEmptyMVar (dead imp)
+
 kill :: Implementation t -> IO ()
 kill imp = do
-  atomicWriteIORef (dead imp) True
-  takeMVar (done imp)
+  tryPutMVar (dead imp) ()
+  takeMVar   (done imp)
 
 clearTChan :: TChan t -> IO ()
 clearTChan tc = do
@@ -46,7 +52,7 @@ clearTChan tc = do
 
 reset :: Implementation t -> IO ()
 reset imp = do
-  writeIORef (dead imp) False
+  tryTakeMVar (dead imp)
   tryTakeMVar (done imp)
   clearTChan (outputChan imp)
   clearTChan (inputChan imp)

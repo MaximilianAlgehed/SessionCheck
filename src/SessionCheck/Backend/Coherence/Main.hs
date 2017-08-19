@@ -10,7 +10,6 @@ import SessionCheck.Test
 import Control.Concurrent
 import Control.Monad
 import Data.Dynamic
-import Data.IORef
 
 checkCoherence :: Spec Dynamic a -> IO ()
 checkCoherence s = do
@@ -19,12 +18,7 @@ checkCoherence s = do
   where
     runFun :: Implementation Dynamic -> Spec Dynamic a -> IO ()
     runFun imp s = do
-      tid <- forkIO $ void $ evaluate imp (dual s)
-      loop imp
+      tid <- forkIO $ void $ evaluate (swapDirection imp) (dual s)
+      readMVar (dead imp)
       killThread tid
       putMVar (done imp) ()
-
-    loop imp = do
-      d <- readIORef (dead imp)
-      threadDelay 100
-      unless d (loop imp)
