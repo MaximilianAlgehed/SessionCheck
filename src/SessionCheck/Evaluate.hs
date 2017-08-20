@@ -51,7 +51,7 @@ isError s = case s of
 accepts :: Spec t a -> t -> Bool
 accepts tr t = case tr of
   Get p     -> test p t
-  Fork tr   -> accepts tr t
+  Interleave tr   -> accepts tr t
   Bind tr _ -> accepts tr t
   _         -> False
 
@@ -59,7 +59,7 @@ accepts tr t = case tr of
 canProduce :: Spec t a -> t -> Bool
 canProduce tr t = case tr of
   Send p    -> test p t
-  Fork tr   -> canProduce tr t
+  Interleave tr   -> canProduce tr t
   Bind tr _ -> canProduce tr t
   _         -> False
 
@@ -174,7 +174,7 @@ stepThread (Hide s c) = do
                        throwError (Bad $ "get " ++ name p)
                      scheduleThread (Hide s c)
 
-    Send p   -> do
+    Send p -> do
       a <- generateTimeout p
       let msg = inj a
       ts <- gets sending
@@ -187,11 +187,11 @@ stepThread (Hide s c) = do
         tell [Output (inj a)]
         scheduleThread (hide (c a))
     
-    Fork t   -> do
+    Interleave t -> do
       mapM scheduleThread [hide t, hide (c ())]
       return ()
 
-    Stop     -> return ()
+    Stop -> return ()
     
     {- Change these two to run to conclusion! -}
     Return a -> scheduleThread (Hide (c a) (\_ -> Stop))

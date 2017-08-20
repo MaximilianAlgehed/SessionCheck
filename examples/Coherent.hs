@@ -19,12 +19,12 @@ incoherent1 = void $ do
 
 incoherent2 :: Int :< t => Spec t ()
 incoherent2 = void $ do
-  fork $ send anyInt
+  interleave $ send anyInt
   send anyInt
 
 incoherent3 :: () :< t => Spec t ()
 incoherent3 = void $ do
-  fork $ get (is ())
+  interleave $ get (is ())
   send (is ())
 
 main :: IO ()
