@@ -1,19 +1,25 @@
+{-# LANGUAGE TypeOperators, FlexibleContexts #-}
 module Calculator where
 
 import Control.Monad
 
 import SessionCheck
+import SessionCheck.Backend.Erlang
 
 calculator :: (String :< t, Int :< t) => Spec t ()
 calculator = do
-  op <- choose ["mul", "div"]
+  op <- choose ["mul", "div", "stop"]
   case op of
     "mul" -> do
       i <- send anyInt
       j <- send anyInt
-      get (i * j)
+      get $ is (i * j)
     "div" -> do
-      i <- send anyInt
-      j <- send anyInt
-      get (i `div` j)
+      i <- send nonNegInt
+      j <- send posInt
+      get $ is (i `div` j)
+    "stop" -> stop
   calculator
+
+main :: IO ()
+main = erlangMain "calculator:main" calculator 

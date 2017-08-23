@@ -38,6 +38,12 @@ negInt = Predicate { apply     = (<0)
                    , satisfies = fmap (negate . (+1) . abs) arbitrary
                    , name      = "negInt" }
 
+-- Accepts any non-negative int
+nonNegInt :: Predicate Int
+nonNegInt = Predicate { apply     = (>=0)
+                      , satisfies = fmap abs arbitrary
+                      , name      = "nonNegInt" }
+
 -- Accepts anything in the range [p, q]
 inRange :: (Ord a, Show a, Arbitrary a) => a -> a ->  Predicate a
 inRange p q = Predicate { apply     = \a -> p <= a && a <= q
