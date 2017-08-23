@@ -6,5 +6,5 @@ import SessionCheck
 
 calculator :: (String :< t, Int :< t) => Spec t ()
 calculator = do
-  op <- choose ["add", "mul", "div", "sub"]
+  op <- choose ["mul", "div"]
   return ()
