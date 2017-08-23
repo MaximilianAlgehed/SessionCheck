@@ -6,7 +6,7 @@ import SessionCheck.Backend.Erlang
 
 protocol :: Int :< t => Spec t Int
 protocol = do
-  fork $ do
+  interleave $ do
     i <- branch [1, (2 :: Int)]
     send (is i)
   i <- choose [4,5]
