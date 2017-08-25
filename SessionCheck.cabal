@@ -26,6 +26,7 @@ library
   other-modules:       SessionCheck.Backend.Erlang.Instances,
                        SessionCheck.Backend.Erlang.Main,
                        SessionCheck.Backend.Coherence.Instances,
+                       SessionCheck.Backend.Coherence.Types,
                        SessionCheck.Backend.Coherence.Main,
                        SessionCheck.Backend.Coherence
   build-depends:       base >= 4.7 && < 5,

@@ -154,7 +154,7 @@ step = do
   stepThread t
 
 stepThread :: Show t => Thread t -> EvalM t ()
-stepThread (Hide s c) = do
+stepThread t@(Hide s c) = do
   imp <- ask
   case s of
     Get p -> do
