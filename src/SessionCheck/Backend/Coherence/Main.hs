@@ -12,6 +12,9 @@ import Control.Concurrent
 import Control.Monad
 import Data.Dynamic
 
+-- Check that a spec can be run against itself without error
+-- Useful for finding deadlocks (arising from uses of interleave)
+-- and unsatisfiable predicates
 checkCoherence :: Spec DynamicValue a -> IO ()
 checkCoherence s = do
   imp <- clean 
