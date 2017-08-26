@@ -22,6 +22,12 @@ anything = Predicate { apply     = const True
                      , satisfies = arbitrary
                      , name      = "anything" }
 
+-- Accepts nothing
+nothing :: Predicate a
+nothing = Predicate { apply     = const False
+                    , satisfies = satisfies nothing
+                    , name      = "nothing" }
+
 -- Accepts any `Int`
 anyInt :: Predicate Int
 anyInt = anything { name = "anyInt" }
@@ -75,3 +81,9 @@ is :: (Eq a, Show a) => a -> Predicate a
 is a = Predicate { apply     = (a==)
                  , satisfies = return a
                  , name      = "is " ++ show a }
+
+-- Accepts any predicate in the list
+anyOf :: [Predicate a] -> Predicate a
+anyOf ps = Predicate { apply     = (\a -> any (flip apply a) ps)
+                     , satisfies = oneof (satisfies <$> ps)
+                     , name      = "anyOf [" ++ intercalate "," (map name ps) ++ "]" }

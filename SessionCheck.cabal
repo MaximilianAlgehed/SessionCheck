@@ -24,6 +24,7 @@ library
                        SessionCheck.Test,
                        SessionCheck
   other-modules:       SessionCheck.Backend.Erlang.Instances,
+                       SessionCheck.Backend.Erlang.Types,
                        SessionCheck.Backend.Erlang.Main,
                        SessionCheck.Backend.Coherence.Instances,
                        SessionCheck.Backend.Coherence.Types,

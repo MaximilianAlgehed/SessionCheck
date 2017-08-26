@@ -9,7 +9,7 @@ protocol = do
   interleave $ do
     i <- branch [1, (2 :: Int)]
     send (is i)
-  i <- choose [4,5]
+  i <- choose [4, 5]
   get (is i)
 
 main :: IO ()

@@ -10,6 +10,7 @@ import Data.Char
 import Data.Maybe
 
 import SessionCheck.Classes
+import SessionCheck.Backend.Erlang.Types
 
 instance Int :< ErlType where
     inj x             
@@ -93,6 +94,11 @@ instance (a :< ErlType) => Maybe a :< ErlType where
       x <- prj x
       return (Just x)
   prj _ = Nothing
+
+instance Atom :< ErlType where
+  inj (Atom s)    = ErlAtom s
+  prj (ErlAtom s) = Just (Atom s)
+  prj _           = Nothing
 
 instance (t :< ErlType) => Erlang t where
     toErlang = inj
