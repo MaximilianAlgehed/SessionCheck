@@ -24,3 +24,7 @@ pingPong ps = do
       p <- choose ps
       pingPong (ps \\ [p])
     Atom "stop"  -> stop
+
+main :: IO ()
+main = do
+  checkCoherent pingPong
