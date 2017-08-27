@@ -26,4 +26,4 @@ request books = do
 main :: IO ()
 main = do
   checkCoherence (bookShop [])
-  --erlangMain "bookShop:main" (bookShop [])
+  erlangMain "bookShop:main" (bookShop [])
