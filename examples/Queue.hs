@@ -8,9 +8,6 @@ safeHead :: [a] -> Maybe a
 safeHead []    = Nothing
 safeHead (x:_) = Just x
 
-safeTail :: [a] -> [a]
-safeTail = drop 1
-
 queue :: (Int :< t, Maybe Int :< t, Atom :< t) => [Int] -> Spec t ()
 queue q = do
   op <- choose $ map atom ["enqueue", "pop", "peek", "stop"]
@@ -20,7 +17,7 @@ queue q = do
       queue (q ++ [i])
     Atom "pop" -> do
       get (is (safeHead q))
-      queue (safeTail q)
+      queue (drop 1 q)
     Atom "peek" -> do
       get (is (safeHead q))
       queue q
