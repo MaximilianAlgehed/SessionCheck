@@ -10,8 +10,12 @@ import SessionCheck.Backend.Erlang
 pingPong :: (Atom :< t, (Atom, Atom) :< t) => [Atom] -> Spec t ()
 pingPong ps = do
   op <- send $ if null ps
-               then anyOf [is (atom "start"), is (atom "stop")]
-               else anyOf [is (atom "start"), is (atom "ping"), is (atom "kill"), is (atom "stop")]
+               then anyOf [ is (atom "start")
+                          , is (atom "stop")]
+               else anyOf [ is (atom "start")
+                          , is (atom "ping")
+                          , is (atom "kill")
+                          , is (atom "stop")]
   case op of
     Atom "start" -> do
       p <- send anything
