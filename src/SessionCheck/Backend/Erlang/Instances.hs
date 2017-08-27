@@ -88,7 +88,7 @@ instance (a :< ErlType) => Maybe a :< ErlType where
   inj Nothing  = ErlAtom "nothing"
   inj (Just x) = ErlTuple [ErlAtom "just", inj x]
 
-  prj (ErlAtom "nothing") = Nothing
+  prj (ErlAtom "nothing") = Just Nothing
   prj (ErlTuple [ErlAtom "just", x]) =
     do
       x <- prj x

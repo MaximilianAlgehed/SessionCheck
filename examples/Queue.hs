@@ -29,3 +29,4 @@ queue q = do
 main :: IO ()
 main = do
   checkCoherence (queue [])
+  erlangMain "queueInterface:main" (queue [])
