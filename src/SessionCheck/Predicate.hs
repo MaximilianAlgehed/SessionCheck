@@ -71,8 +71,8 @@ choiceOf as = Predicate { apply     = flip elem as
                         , name      = "choiceOf " ++ show as }
 
 -- Accepts any permuation of `as`
-permutationOf :: (Eq a, Show a) => [a] -> Predicate [a]
-permutationOf as = Predicate { apply     = \as' -> elem as' (permutations as)
+permutationOf :: (Eq a, Ord a, Show a) => [a] -> Predicate [a]
+permutationOf as = Predicate { apply     = \as' -> sort as == sort as'
                              , satisfies = shuffle as
                              , name      = "permutationOf " ++ show as }
 

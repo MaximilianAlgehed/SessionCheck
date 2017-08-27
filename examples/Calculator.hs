@@ -22,4 +22,6 @@ calculator = do
   calculator
 
 main :: IO ()
-main = erlangMain "calculator:main" calculator 
+main = do
+  checkCoherence calculator
+  erlangMain "calculator:main" calculator 

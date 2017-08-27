@@ -13,4 +13,6 @@ protocol = do
   get (is i)
 
 main :: IO ()
-main = erlangMain "concurrent:main" protocol
+main = do
+  checkCoherence protocol
+  erlangMain "concurrent:main" protocol

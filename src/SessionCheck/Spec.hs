@@ -45,11 +45,7 @@ interleave = Interleave
 stop :: Spec t a
 stop = Stop
 
--- Run two protocols in parallel
-(//) :: Spec t a -> Spec t b -> Spec t ()
-l // r = interleave l >> r >> return ()
-
--- The dual of a predicate, `dual . dual = id`
+-- The dual of a specification, `dual . dual = id`
 dual :: Spec t a -> Spec t a
 dual s = case s of
   Get p        -> Send p

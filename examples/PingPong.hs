@@ -27,4 +27,4 @@ pingPong ps = do
 
 main :: IO ()
 main = do
-  checkCoherent pingPong
+  checkCoherence (pingPong [])

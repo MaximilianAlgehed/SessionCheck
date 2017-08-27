@@ -25,12 +25,10 @@ clean = do
   return $ Imp oc ic d mv (return ())
 
 peek :: Implementation t -> IO (Maybe t)
-peek imp = do
-  d <- isDead imp
-  if d then
-    return Nothing
-  else
-    timeout (10^6) (atomically . peekTChan . inputChan $ imp)
+peek imp = timeout (10^3) (atomically . peekTChan . inputChan $ imp)
+
+peekLong :: Implementation t -> IO (Maybe t)
+peekLong imp = timeout (10^6) (atomically . peekTChan . inputChan $ imp)
 
 pop :: Implementation t -> IO ()
 pop = void . atomically . readTChan . inputChan

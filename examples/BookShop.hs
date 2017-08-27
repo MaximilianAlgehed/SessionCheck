@@ -24,4 +24,6 @@ request books = do
     "done"    -> stop
 
 main :: IO ()
-main = erlangMain "bookShop:main" (bookShop [])
+main = do
+  checkCoherence (bookShop [])
+  --erlangMain "bookShop:main" (bookShop [])

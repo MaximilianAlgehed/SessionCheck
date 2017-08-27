@@ -11,6 +11,7 @@ import Control.DeepSeq
 import System.Timeout
 import Test.QuickCheck
 import Data.Maybe
+import Data.List
 
 import SessionCheck.Spec hiding (get)
 import SessionCheck.Classes
@@ -123,7 +124,8 @@ wakeThread :: Show t => EvalM t (Thread t)
 wakeThread = do
   ss <- get
   when (empty ss) (throwError $ Amb "Internal error")
-  prg <- liftIO $ generate arbitrary
+  prg <- liftIO $ generate
+    (frequency [(length (sending ss), return True), (length (getting ss), return False)])
   if (not . null $ sending ss) && ((null $ getting ss) || prg) then
     wakeSending 
   else
@@ -150,6 +152,18 @@ eval = do
 -- Take a single step in evaluating the current set of threads
 step :: Show t => EvalM t ()
 step = do
+  s <- gets sending
+  -- When there are no sending threads we _need_ to get a message within a timeout
+  when (null s) $ do
+    imp <- ask
+    g <- gets getting
+    mi  <- liftIO $ peekLong imp
+    case mi of
+      Nothing -> throwError $
+                    Timeout $
+                      "Timeout on gets: [" ++
+                        intercalate "," (map (\(Hide (Get p) _) -> name p) g) ++ "]"
+      _       -> return ()
   t <- wakeThread
   stepThread t
 
@@ -161,7 +175,7 @@ stepThread t@(Hide s c) = do
       mi <- liftIO $ peek imp
       ts <- gets getting
       case mi of
-        Nothing -> throwError $ Timeout $ "get " ++ name p 
+        Nothing -> scheduleThread t
         Just i  -> if test p i then do
                      tell [Input i]
                      when (any (traceAccepts i) ts) 
@@ -172,7 +186,7 @@ stepThread t@(Hide s c) = do
                      unless (any (traceAccepts i) ts) $ do
                        tell [InputViolates (name p) i]
                        throwError (Bad $ "get " ++ name p)
-                     scheduleThread (Hide s c)
+                     scheduleThread t
 
     Send p -> do
       a <- generateTimeout p
@@ -182,18 +196,15 @@ stepThread t@(Hide s c) = do
         throwError (Amb $ "send " ++ name p) -- TODO better error here
       else do
         d <- liftIO $ isDead imp
-        when d (throwError $ Timeout ("send " ++ name p))
+        when d (throwError $ Timeout ("trying to send \"" ++ name p ++ "\" but channel is dead"))
         void . liftIO . atomically $ writeTChan (outputChan imp) msg
         tell [Output (inj a)]
         scheduleThread (hide (c a))
     
-    Interleave t -> do
-      mapM scheduleThread [hide t, hide (c ())]
-      return ()
+    Interleave t' -> mapM_ scheduleThread [hide t', hide (c ())]
 
     Stop -> return ()
     
-    {- Change these two to run to conclusion! -}
     Return a -> scheduleThread (Hide (c a) (\_ -> Stop))
 
     Bind s f -> scheduleThread (Hide s (\a -> f a >>= c))
