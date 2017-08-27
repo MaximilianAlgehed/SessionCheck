@@ -3,6 +3,7 @@ module SessionCheck.Evaluate where
 
 import Control.Concurrent.STM.TChan
 import Control.Concurrent.STM
+import Control.Concurrent.MVar
 import Control.Monad.Writer
 import Control.Monad.Except
 import Control.Monad.Reader
@@ -17,28 +18,7 @@ import SessionCheck.Spec hiding (get)
 import SessionCheck.Classes
 import SessionCheck.Predicate
 import SessionCheck.Backend
-
--- The status of taking a single step in the execution of a protocol
-data Status t = Sent t
-              | Got  t
-              | Done
-              | Skip
-              | GotBad String t
-              | Step
-              | Bad String
-              | Amb String
-              | Timeout String
-
-instance Show t => Show (Status t) where
-  show (Sent t)     = "Sent: " ++ show t
-  show (Got t)      = "Got: " ++ show t
-  show (GotBad p t) = "GotBad: " ++ p ++ " " ++ show t
-  show Done         = "Done"
-  show Skip         = "Skip"
-  show Step         = "Step"
-  show (Bad e)      = "Bad: " ++ e
-  show (Amb e)      = "Ambiguity: " ++ e
-  show (Timeout e)  = "Timeout: " ++ e
+import SessionCheck.Types
 
 -- Check if a status represents an error
 isError :: Status t -> Bool
@@ -91,7 +71,7 @@ evaluate :: Show t
          -> IO (Either (Status t) (), [LogEntry t])
 evaluate imp s = do
   (s, w) <- runEvalM s imp eval
-  kill imp
+  kill imp (either id (const Ok) s)
   return (s, w)
 
 runEvalM :: Spec t a
@@ -116,14 +96,14 @@ type EvalM t a = StateT (SchedulerState t)
 
 scheduleThread :: Show t => Thread t -> EvalM t ()
 scheduleThread t@(Hide s _) = case s of
-    Get _  -> modify $ \ss -> ss { getting = t : getting ss }
-    Send _ -> modify $ \ss -> ss { sending = t : sending ss }
-    _      -> stepThread t
+  Get _  -> modify $ \ss -> ss { getting = t : getting ss }
+  Send _ -> modify $ \ss -> ss { sending = t : sending ss }
+  _      -> stepThread t
 
 wakeThread :: Show t => EvalM t (Thread t)
 wakeThread = do
   ss <- get
-  when (empty ss) (throwError $ Amb "Internal error")
+  when (empty ss) (throwError $ Bad "Internal error")
   prg <- liftIO $ generate
     (frequency [(length (sending ss), return True), (length (getting ss), return False)])
   if (not . null $ sending ss) && ((null $ getting ss) || prg) then
@@ -159,10 +139,15 @@ step = do
     g <- gets getting
     mi  <- liftIO $ peekLong imp
     case mi of
-      Nothing -> throwError $
-                    Timeout $
-                      "Timeout on gets: [" ++
-                        intercalate "," (map (\(Hide (Get p) _) -> name p) g) ++ "]"
+      Nothing -> do
+        let names = "[" ++ intercalate ","  (map (\(Hide (Get p) _) -> name p) g) ++ "]"
+        d <- liftIO $ isDead imp
+        when d (do
+          r <- liftIO $ readMVar (deadReason imp)
+          throwError $ Timeout ("Timeout on gets " ++
+                                names ++ " and channel is dead with reason " ++
+                                show r))
+        throwError $ Timeout $ "Timeout on gets: " ++ names
       _       -> return ()
   t <- wakeThread
   stepThread t
@@ -196,7 +181,11 @@ stepThread t@(Hide s c) = do
         throwError (Amb $ "send " ++ name p) -- TODO better error here
       else do
         d <- liftIO $ isDead imp
-        when d (throwError $ Timeout ("trying to send \"" ++ name p ++ "\" but channel is dead"))
+        when d (do
+          r <- liftIO $ readMVar (deadReason imp)
+          throwError $ Timeout ("trying to send \"" ++
+                                name p ++ "\" but channel is dead with reason " ++
+                                show r))
         void . liftIO . atomically $ writeTChan (outputChan imp) msg
         tell [Output (inj a)]
         scheduleThread (hide (c a))

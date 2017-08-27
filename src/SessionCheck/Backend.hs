@@ -6,9 +6,12 @@ import Control.Concurrent.MVar
 import Control.Monad
 import System.Timeout
 
+import SessionCheck.Types
+
 data Implementation t = Imp { outputChan :: TChan t
                             , inputChan  :: TChan t
                             , dead       :: MVar ()
+                            , deadReason :: MVar (Status t)
                             , done       :: MVar ()
                             , run        :: IO () }
 
@@ -21,8 +24,9 @@ clean = do
   oc <- atomically $ newTChan 
   ic <- atomically $ newTChan
   d  <- newEmptyMVar
+  dr <- newEmptyMVar
   mv <- newEmptyMVar
-  return $ Imp oc ic d mv (return ())
+  return $ Imp oc ic d dr mv (return ())
 
 peek :: Implementation t -> IO (Maybe t)
 peek imp = timeout (10^3) (atomically . peekTChan . inputChan $ imp)
@@ -36,9 +40,10 @@ pop = void . atomically . readTChan . inputChan
 isDead :: Implementation t -> IO Bool
 isDead imp = not <$> isEmptyMVar (dead imp)
 
-kill :: Implementation t -> IO ()
-kill imp = do
+kill :: Implementation t -> Status t -> IO ()
+kill imp reason = do
   tryPutMVar (dead imp) ()
+  tryPutMVar (deadReason imp) reason
   takeMVar   (done imp)
 
 clearTChan :: TChan t -> IO ()
@@ -52,5 +57,6 @@ reset :: Implementation t -> IO ()
 reset imp = do
   tryTakeMVar (dead imp)
   tryTakeMVar (done imp)
+  tryTakeMVar (deadReason imp)
   clearTChan (outputChan imp)
   clearTChan (inputChan imp)

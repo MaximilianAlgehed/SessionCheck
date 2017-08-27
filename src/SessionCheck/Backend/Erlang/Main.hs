@@ -37,7 +37,7 @@ erlang opts = do
 runFun :: Implementation ErlType
        -> Options
        -> IO ()
-runFun imp@(Imp readChan writeChan _ done _) opts = do
+runFun imp@(Imp readChan writeChan _ _ done _) opts = do
   mbox <- createMBox (self opts)
   rpcCall mbox (Short erl) (targetModule opts) (targetFunction opts) []
   mboxSend mbox (Short erl) (Right "p") (mboxSelf mbox)

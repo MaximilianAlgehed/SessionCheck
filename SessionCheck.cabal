@@ -22,6 +22,7 @@ library
                        SessionCheck.Backend,
                        SessionCheck.Backend.Erlang,
                        SessionCheck.Test,
+                       SessionCheck.Types,
                        SessionCheck
   other-modules:       SessionCheck.Backend.Erlang.Instances,
                        SessionCheck.Backend.Erlang.Types,

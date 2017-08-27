@@ -24,5 +24,6 @@ checkCoherence s = do
     runFun imp s = do
       tid <- forkIO $ void $ evaluate (swapDirection imp) (dual s)
       readMVar (dead imp)
+      readMVar (deadReason imp)
       killThread tid
       putMVar (done imp) ()
