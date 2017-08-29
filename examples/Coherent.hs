@@ -13,7 +13,7 @@ coherent1 = void $ do
 
 coherent2 :: () :< t => Spec t ()
 coherent2 = void $ do
-  interleave $ get (is ())
+  async $ get (is ())
   send (is ())
 
 incoherent1 :: Int :< t => Spec t ()
@@ -24,7 +24,7 @@ incoherent1 = void $ do
 
 incoherent2 :: Int :< t => Spec t ()
 incoherent2 = void $ do
-  interleave $ send anyInt
+  async $ send anyInt
   send anyInt
 
 main :: IO ()

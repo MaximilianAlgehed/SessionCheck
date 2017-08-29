@@ -22,7 +22,7 @@ pingPong ps = do
       pingPong (p : ps)
     Atom "ping"  -> do
       p <- choose ps
-      interleave $ get (is (atom "pong", p))
+      async $ get (is (atom "pong", p))
       pingPong ps
     Atom "kill"  -> do
       p <- choose ps

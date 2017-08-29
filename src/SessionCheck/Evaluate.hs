@@ -32,7 +32,7 @@ isError s = case s of
 accepts :: Spec t a -> t -> Bool
 accepts tr t = case tr of
   Get p     -> test p t
-  Interleave tr   -> accepts tr t
+  Async tr  -> accepts tr t
   Bind tr _ -> accepts tr t
   _         -> False
 
@@ -40,7 +40,7 @@ accepts tr t = case tr of
 canProduce :: Spec t a -> t -> Bool
 canProduce tr t = case tr of
   Send p    -> test p t
-  Interleave tr   -> canProduce tr t
+  Async tr  -> canProduce tr t
   Bind tr _ -> canProduce tr t
   _         -> False
 
@@ -190,7 +190,7 @@ stepThread t@(Hide s c) = do
         tell [Output (inj a)]
         scheduleThread (hide (c a))
     
-    Interleave t' -> mapM_ scheduleThread [hide t', hide (c ())]
+    Async t' -> mapM_ scheduleThread [hide t', hide (c ())]
 
     Stop -> return ()
     
