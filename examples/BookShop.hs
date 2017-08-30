@@ -1,4 +1,5 @@
-{-# LANGUAGE TypeOperators, FlexibleContexts #-}
+{-# LANGUAGE TypeOperators
+           , FlexibleContexts #-}
 module BookShop where
 
 import SessionCheck

@@ -1,4 +1,5 @@
-{-# LANGUAGE TypeOperators, FlexibleContexts #-}
+{-# LANGUAGE TypeOperators
+           , FlexibleContexts #-}
 module Queue where
 
 import SessionCheck

@@ -1,4 +1,5 @@
-{-# LANGUAGE TypeOperators, FlexibleContexts #-}
+{-# LANGUAGE TypeOperators
+           , FlexibleContexts #-}
 module Calculator where
 
 import Control.Monad
