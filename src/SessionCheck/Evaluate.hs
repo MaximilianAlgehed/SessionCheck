@@ -81,10 +81,12 @@ runEvalM :: Spec t a
 runEvalM s imp = runWriterT .
                  runExceptT .
                  flip runReaderT imp .
-                 flip evalStateT (SS [] [hide s])
+                 flip evalStateT (SS [] [hide s] Nothing)
 
-data SchedulerState t = SS { getting :: [Thread t]
-                           , sending :: [Thread t] }
+data SchedulerState t = SS { getting       :: [Thread t]
+                           , sending       :: [Thread t]
+                           -- To be used for shrinking
+                           , previousTrace :: Maybe [LogEntry t] }
 
 empty :: SchedulerState t -> Bool
 empty ss = null (getting ss) && null (sending ss)
