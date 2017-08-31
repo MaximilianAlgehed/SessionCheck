@@ -26,3 +26,26 @@ data SMTPCommand = HELO Domain
                  | QUIT
                  | TURN
                  deriving (Ord, Eq, Show)
+
+data SMTPReply = R500 
+               | R501
+               | R502
+               | R503
+               | R504
+               | R211
+               | R214
+               | R220 Domain
+               | R221 Domain
+               | R421 Domain
+               | R250 
+               | R251 ForwardPath
+               | R450
+               | R550
+               | R451
+               | R551 ForwardPath
+               | R452
+               | R552
+               | R553
+               | R354
+               | R554
+               deriving (Ord, Eq, Show)

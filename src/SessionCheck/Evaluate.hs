@@ -36,7 +36,7 @@ accepts tr t = case tr of
   Bind tr _ -> accepts tr t
   _         -> False
 
--- Check if a specification could have produces a message
+-- Check if a specification could have produced a message
 canProduce :: Spec t a -> t -> Bool
 canProduce tr t = case tr of
   Send p    -> test p t

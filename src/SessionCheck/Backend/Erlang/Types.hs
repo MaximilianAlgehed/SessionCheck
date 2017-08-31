@@ -14,7 +14,7 @@ instance Arbitrary Atom where
     suf <- listOf (elements $ ['a'..'z'] ++ ['A'..'Z'])
     fst <- elements ['a'..'z']
     return (atom $ fst : suf)
-  shrink (Atom s) = Atom <$> shrink s
+  shrink (Atom s) = Atom <$> filter (not . null) (shrink s)
 
 atom :: String -> Atom
 atom = Atom
