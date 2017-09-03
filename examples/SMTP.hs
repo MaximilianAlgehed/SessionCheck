@@ -50,10 +50,16 @@ data SMTPReply = R500
                | R554
                deriving (Ord, Eq, Show)
 
-heloMessage :: Predicate STMPCommand
+heloMessage :: Predicate SMTPCommand 
 heloMessage = Predicate { apply = \c -> case c of
                                           HELO _ -> True
                                           _      -> False
                         , satisfies = HELO <$> arbitrary
                         , shrink    = \HELO d -> HELO <$> shrink d
                         , name      = "heloMessage" }
+
+endOfMail :: Predicate String
+endOfMail = Predicate { apply     = (==".")
+                      , satisfies = return "."
+                      , shrink    = \_ -> return []
+                      , name      = "endOfMail" }
