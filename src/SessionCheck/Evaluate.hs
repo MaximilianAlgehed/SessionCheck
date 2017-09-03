@@ -117,30 +117,54 @@ wakeThread = do
   else
     wakeGetting
   where
-    -- TODO:
-    -- Here we need to look at the trace if we have it and decide based
-    -- on that what thread we will wake
     wakeGetting = do
       ss <- get
-      g' <- liftIO $ generate $ shuffle (getting ss)
-      modify $ \ss -> ss { getting = tail g' }
-      return ( head g'
-             , Nothing
-             -- TODO:
-             -- This action needs to get rid of the right prefix of the trace
-             , return ())
-    -- TODO:
-    -- Here we need to look at the trace if we have it and decide based on that
-    -- what thread we will wake
+      case previousTrace ss of 
+        Just (Input t : tr) -> do
+          -- Naive solution for now, not expecting this to work well with concurrent traces
+          g' <- liftIO $ generate $ shuffle (getting ss)
+          modify $ \ss -> ss { getting = tail g' }
+          return ( head g'
+                 , if traceAccepts t (head g') then Just t else Nothing
+                 , modify $ \ss -> ss { previousTrace = fmap tail $ previousTrace ss } )
+
+        Just (InputViolates t : tr) -> do
+          -- Naive solution for now, not expecting this to work well with concurrent traces
+          g' <- liftIO $ generate $ shuffle (getting ss)
+          modify $ \ss -> ss { getting = tail g' }
+          return ( head g'
+                 , if not (traceAccepts t (head g')) then Just t else Nothing
+                 , modify $ \ss -> ss { previousTrace = fmap tail $ previousTrace ss } )
+
+        Just tr -> error "Not yet implemented" -- TODO: Implement
+
+        Nothing -> do
+          g' <- liftIO $ generate $ shuffle (getting ss)
+          modify $ \ss -> ss { getting = tail g' }
+          return ( head g'
+                 , Nothing
+                 , return ())
+
     wakeSending = do
       ss <- get
-      p' <- liftIO $ generate $ shuffle (sending ss)
-      modify $ \ss -> ss { sending = tail p' }
-      return ( head p'
-             , Nothing
-             -- TODO:
-             -- This action needs to get rid of the right prefix of the trace
-             , return ())
+      case previousTrace ss of
+        Just (Output t : tr) -> do
+          -- Naive solution for now, not expecting this to work well with concurrent
+          -- traces
+          p' <- liftIO $ generate $ shuffle (sending ss)
+          modify $ \ss -> ss { sending = tail p' }
+          return ( head p'
+                 , if traceProduces t (head p') then Just t else Nothing
+                 , modify $ \ss -> ss { previousTrace = fmap tail $ previousTrace ss } )
+
+        Just tr -> error "Not yet implemented" -- TODO: Implement
+
+        Nothing -> do
+          p' <- liftIO $ generate $ shuffle (sending ss)
+          modify $ \ss -> ss { sending = tail p' }
+          return ( head p'
+                 , Nothing
+                 , return ())
 
 eval :: Show t => EvalM t ()
 eval = do
@@ -196,7 +220,7 @@ stepThread (t@(Hide s c), mprev, success) = do
                      success
 
     Send p -> do
-      a <- generateTimeout p
+      a <- generateTimeoutShrink p mprev
       let msg = inj a
       ts <- gets sending
       if any (traceProduces msg) ts then
@@ -220,6 +244,10 @@ stepThread (t@(Hide s c), mprev, success) = do
     Return a -> scheduleThread (Hide (c a) (\_ -> Stop))
 
     Bind s f -> scheduleThread (Hide s (\a -> f a >>= c))
+
+-- TODO: Implement
+generateTimeoutShrink :: (a :< t, NFData a) => Maybe t -> Predicate a -> EvalM t a
+generateTimeoutShrink mprev p = generateTimeout p
 
 generateTimeout :: NFData a => Predicate a -> EvalM t a
 generateTimeout p = do
