@@ -125,6 +125,7 @@ wakeThread = do
           g' <- liftIO $ generate $ shuffle (getting ss)
           modify $ \ss -> ss { getting = tail g' }
           return ( head g'
+                 -- Might want to replace this by a look ahead instead
                  , if traceAccepts t (head g') then Just t else Nothing
                  , modify $ \ss -> ss { previousTrace = fmap tail $ previousTrace ss } )
 
@@ -133,10 +134,11 @@ wakeThread = do
           g' <- liftIO $ generate $ shuffle (getting ss)
           modify $ \ss -> ss { getting = tail g' }
           return ( head g'
+                 -- Might want to replace this by a look ahead instead
                  , if not (traceAccepts t (head g')) then Just t else Nothing
                  , modify $ \ss -> ss { previousTrace = fmap tail $ previousTrace ss } )
 
-        Just tr -> error "Not yet implemented" -- TODO: Implement
+        Just tr -> error "Not yet implemented" -- TODO: Implement the look ahead
 
         Nothing -> do
           g' <- liftIO $ generate $ shuffle (getting ss)
@@ -154,10 +156,11 @@ wakeThread = do
           p' <- liftIO $ generate $ shuffle (sending ss)
           modify $ \ss -> ss { sending = tail p' }
           return ( head p'
+                 -- Might want to replace this by a look ahead instead
                  , if traceProduces t (head p') then Just t else Nothing
                  , modify $ \ss -> ss { previousTrace = fmap tail $ previousTrace ss } )
 
-        Just tr -> error "Not yet implemented" -- TODO: Implement
+        Just tr -> error "Not yet implemented" -- TODO: Implement the look ahead
 
         Nothing -> do
           p' <- liftIO $ generate $ shuffle (sending ss)
