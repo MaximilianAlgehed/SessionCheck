@@ -55,11 +55,22 @@ heloMessage = Predicate { apply = \c -> case c of
                                           HELO _ -> True
                                           _      -> False
                         , satisfies = HELO <$> arbitrary
-                        , shrink    = \HELO d -> HELO <$> shrink d
+                        , shrunk    = \(HELO d) -> elements (HELO <$> shrink d)
                         , name      = "heloMessage" }
+
+mailMessage :: Predicate SMTPCommand
+mailMessage = Predicate { apply = \c -> case c of
+                                          MAIL_FROM _ -> True
+                                          _           -> False
+                        , satisfies = MAIL_FROM <$> arbitrary
+                        , shrunk    = \(MAIL_FROM d) -> elements (MAIL_FROM <$> shrink d)
+                        , name      = "mailMessage" }
+
+dataMessage :: Predicate SMTPCommand
+dataMessage = (is DATA) { name = "dataMessage" }
 
 endOfMail :: Predicate String
 endOfMail = Predicate { apply     = (==".")
                       , satisfies = return "."
-                      , shrink    = \_ -> return []
+                      , shrunk    = \_ -> return []
                       , name      = "endOfMail" }
