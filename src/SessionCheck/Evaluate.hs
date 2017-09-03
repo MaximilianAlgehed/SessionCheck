@@ -70,22 +70,22 @@ evaluate :: Show t
          -> Spec t a
          -> IO (Either (Status t) (), [LogEntry t])
 evaluate imp s = do
-  (s, w) <- runEvalM s imp eval
+  (s, w) <- runEvalM s imp Nothing eval
   kill imp (either id (const Ok) s)
   return (s, w)
 
 runEvalM :: Spec t a
          -> Implementation t
+         -> Maybe [LogEntry t]
          -> EvalM t b
          -> IO (Either (Status t) b, [LogEntry t])
-runEvalM s imp = runWriterT .
-                 runExceptT .
-                 flip runReaderT imp .
-                 flip evalStateT (SS [] [hide s] Nothing)
+runEvalM s imp log = runWriterT .
+                     runExceptT .
+                     flip runReaderT imp .
+                     flip evalStateT (SS [] [hide s] log)
 
 data SchedulerState t = SS { getting       :: [Thread t]
                            , sending       :: [Thread t]
-                           -- To be used for shrinking
                            , previousTrace :: Maybe [LogEntry t] }
 
 empty :: SchedulerState t -> Bool
@@ -100,29 +100,47 @@ scheduleThread :: Show t => Thread t -> EvalM t ()
 scheduleThread t@(Hide s _) = case s of
   Get _  -> modify $ \ss -> ss { getting = t : getting ss }
   Send _ -> modify $ \ss -> ss { sending = t : sending ss }
-  _      -> stepThread t
+  _      -> stepThread (t, Nothing, return ())
 
-wakeThread :: Show t => EvalM t (Thread t)
+-- Returns: a thread, a possible previous entry, and an action to perform if progress is made
+wakeThread :: Show t => EvalM t (Thread t, Maybe t, EvalM t ())
 wakeThread = do
   ss <- get
   when (empty ss) (throwError $ Bad "Internal error")
   prg <- liftIO $ generate
     (frequency [(length (sending ss), return True), (length (getting ss), return False)])
+  -- TODO:
+  -- It is possible that this decision should be influenced by the
+  -- current trace (if we have it)
   if (not . null $ sending ss) && ((null $ getting ss) || prg) then
     wakeSending 
   else
     wakeGetting
   where
+    -- TODO:
+    -- Here we need to look at the trace if we have it and decide based
+    -- on that what thread we will wake
     wakeGetting = do
       ss <- get
       g' <- liftIO $ generate $ shuffle (getting ss)
       modify $ \ss -> ss { getting = tail g' }
-      return (head g')
+      return ( head g'
+             , Nothing
+             -- TODO:
+             -- This action needs to get rid of the right prefix of the trace
+             , return ())
+    -- TODO:
+    -- Here we need to look at the trace if we have it and decide based on that
+    -- what thread we will wake
     wakeSending = do
       ss <- get
       p' <- liftIO $ generate $ shuffle (sending ss)
       modify $ \ss -> ss { sending = tail p' }
-      return (head p')
+      return ( head p'
+             , Nothing
+             -- TODO:
+             -- This action needs to get rid of the right prefix of the trace
+             , return ())
 
 eval :: Show t => EvalM t ()
 eval = do
@@ -154,8 +172,8 @@ step = do
   t <- wakeThread
   stepThread t
 
-stepThread :: Show t => Thread t -> EvalM t ()
-stepThread t@(Hide s c) = do
+stepThread :: Show t => (Thread t, Maybe t, EvalM t ()) -> EvalM t ()
+stepThread (t@(Hide s c), mprev, success) = do
   imp <- ask
   case s of
     Get p -> do
@@ -169,11 +187,13 @@ stepThread t@(Hide s c) = do
                           (throwError (Amb $ "get " ++ name p))
                      liftIO $ pop imp
                      scheduleThread (hide $ c (fromJust (prj i)))
+                     success
                    else do
                      unless (any (traceAccepts i) ts) $ do
                        tell [InputViolates (name p) i]
                        throwError (Bad $ "get " ++ name p)
                      scheduleThread t
+                     success
 
     Send p -> do
       a <- generateTimeout p
@@ -191,6 +211,7 @@ stepThread t@(Hide s c) = do
         void . liftIO . atomically $ writeTChan (outputChan imp) msg
         tell [Output (inj a)]
         scheduleThread (hide (c a))
+        success
     
     Async t' -> mapM_ scheduleThread [hide t', hide (c ())]
 

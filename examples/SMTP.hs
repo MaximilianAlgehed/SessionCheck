@@ -49,3 +49,11 @@ data SMTPReply = R500
                | R354
                | R554
                deriving (Ord, Eq, Show)
+
+heloMessage :: Predicate STMPCommand
+heloMessage = Predicate { apply = \c -> case c of
+                                          HELO _ -> True
+                                          _      -> False
+                        , satisfies = HELO <$> arbitrary
+                        , shrink    = \HELO d -> HELO <$> shrink d
+                        , name      = "heloMessage" }
