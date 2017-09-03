@@ -1,4 +1,4 @@
-{-# LANGUAGE GADTs #-}
+{-# LANGUAGE GADTs, TypeOperators #-}
 module SessionCheck.Evaluate where
 
 import Control.Concurrent.STM.TChan
@@ -128,7 +128,7 @@ wakeThread = do
                  , if traceAccepts t (head g') then Just t else Nothing
                  , modify $ \ss -> ss { previousTrace = fmap tail $ previousTrace ss } )
 
-        Just (InputViolates t : tr) -> do
+        Just (InputViolates _ t : tr) -> do
           -- Naive solution for now, not expecting this to work well with concurrent traces
           g' <- liftIO $ generate $ shuffle (getting ss)
           modify $ \ss -> ss { getting = tail g' }
@@ -246,8 +246,8 @@ stepThread (t@(Hide s c), mprev, success) = do
     Bind s f -> scheduleThread (Hide s (\a -> f a >>= c))
 
 -- TODO: Implement
-generateTimeoutShrink :: (a :< t, NFData a) => Maybe t -> Predicate a -> EvalM t a
-generateTimeoutShrink mprev p = generateTimeout p
+generateTimeoutShrink :: (a :< t, NFData a) => Predicate a -> Maybe t -> EvalM t a
+generateTimeoutShrink p mprev = generateTimeout p
 
 generateTimeout :: NFData a => Predicate a -> EvalM t a
 generateTimeout p = do
