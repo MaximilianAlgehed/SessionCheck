@@ -7,8 +7,9 @@ import Test.QuickCheck
 
 import SessionCheck
 
+-- Approximations
 type Domain = String
-type ForwardPath = String -- Approximation
+type ForwardPath = String
 type ReversePath = ForwardPath 
 
 data SMTPCommand = HELO Domain
