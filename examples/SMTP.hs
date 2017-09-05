@@ -1,9 +1,13 @@
 {-# LANGUAGE TypeOperators
-           , FlexibleContexts #-}
+           , FlexibleContexts
+           , DeriveGeneric
+           , DeriveAnyClass #-}
 module SMTP where
 
+import GHC.Generics
 import Control.Monad
 import Test.QuickCheck
+import Control.DeepSeq
 
 import SessionCheck
 
@@ -26,7 +30,7 @@ data SMTPCommand = HELO Domain
                  | NOOP
                  | QUIT
                  | TURN
-                 deriving (Ord, Eq, Show)
+                 deriving (Ord, Eq, Show, Generic, NFData)
 
 data SMTPReply = R500 
                | R501
@@ -49,7 +53,7 @@ data SMTPReply = R500
                | R553
                | R354
                | R554
-               deriving (Ord, Eq, Show)
+               deriving (Ord, Eq, Show, Generic, NFData)
 
 heloMessage :: Predicate SMTPCommand 
 heloMessage = Predicate { apply = \c -> case c of
@@ -67,6 +71,14 @@ mailMessage = Predicate { apply = \c -> case c of
                         , shrunk    = \(MAIL_FROM d) -> elements (MAIL_FROM <$> shrink d)
                         , name      = "mailMessage" }
 
+rcptMessage :: Predicate SMTPCommand
+rcptMessage = Predicate { apply = \c -> case c of
+                                          RCPT_TO _ -> True
+                                          _         -> False
+                        , satisfies = RCPT_TO <$> arbitrary
+                        , shrunk    = \(RCPT_TO d) -> elements (RCPT_TO <$> shrink d)
+                        , name      = "rcptMessage" }
+
 dataMessage :: Predicate SMTPCommand
 dataMessage = (is DATA) { name = "dataMessage" }
 
@@ -75,3 +87,38 @@ endOfMail = Predicate { apply     = (==".")
                       , satisfies = return "."
                       , shrunk    = \_ -> return []
                       , name      = "endOfMail" }
+
+mail :: (String :< t, SMTPReply :< t, SMTPCommand :< t) => Spec t SMTPReply
+mail = do
+  msg <- get $ anyOf [ rcptMessage, dataMessage ]
+  case msg of
+    RCPT_TO _ -> do
+      send $ anyOf [is R250, is R550]
+      mail
+    DATA      -> do
+      send $ is R354
+      dataRecv
+
+dataRecv :: (String :< t, SMTPReply :< t) => Spec t SMTPReply
+dataRecv = do
+  line <- get $ anyOf [ anything, is "." ]
+  case line of
+    "." -> send $ is R250
+    _   -> dataRecv
+
+smtp :: (String :< t, SMTPReply :< t, SMTPCommand :< t) => Spec t ()
+smtp = do
+  -- Handshake
+  get  heloMessage
+  send (is R250) -- Approximation
+  send heloMessage
+  get  (is R250) -- Approximation
+
+  -- Choice of operations
+  op <- get $ anyOf [ mailMessage, is QUIT ]
+  case op of
+    MAIL_FROM _ -> do
+      send (is R250) -- Approximation
+      mail
+      smtp
+    QUIT        -> stop
