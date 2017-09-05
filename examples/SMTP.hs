@@ -55,12 +55,6 @@ data SMTPReply = R500
                | R554
                deriving (Ord, Eq, Show, Generic, NFData)
 
-{- Consider implementing a function for doing these things,
- - the pattern matching bit in the case could be done using
- - exceptions to catch that the uninteresting bits where evaluated
- - and therefore the heads match (?), to this we can add some way of
- - doing the extraction in the implementation of `shrunk` (using "lenses"?)-}
-
 heloMessage :: Predicate SMTPCommand 
 heloMessage = Predicate { apply = \c -> case c of
                                           HELO _ -> True
