@@ -28,6 +28,15 @@ data SMTPCommand = HELO Domain
                  | QUIT
                  deriving (Ord, Eq, Show, Generic, NFData)
 
+instance Arbitrary SMTPCommand where
+  arbitrary = oneof [ HELO      <$> listOf (elements $ ['a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9'] ++ ":/.")
+                    , MAIL_FROM <$> listOf (elements $ ['a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9'] ++ ":/.")
+                    , RCPT_TO   <$> listOf (elements $ ['a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9'] ++ ":/.")
+                    , return DATA
+                    , return RSET
+                    , return NOOP
+                    , return QUIT ]
+
 smtpCommandParser :: ReadP SMTPCommand
 smtpCommandParser = foldr (+++) pfail [ heloParser
                                       , mailFromParser
@@ -73,15 +82,6 @@ smtpCommandPrinter c = case c of
   RCPT_TO fp   -> "RCPT TO: " ++ fp 
   _            -> show c
 
-instance Arbitrary SMTPCommand where
-  arbitrary = oneof [ HELO      <$> listOf (elements $ ['a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9'] ++ ":/.")
-                    , MAIL_FROM <$> listOf (elements $ ['a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9'] ++ ":/.")
-                    , RCPT_TO   <$> listOf (elements $ ['a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9'] ++ ":/.")
-                    , return DATA
-                    , return RSET
-                    , return NOOP
-                    , return QUIT ]
-
 prop_print_parse_command :: SMTPCommand -> Bool
 prop_print_parse_command c = (readP_to_S smtpCommandParser) (smtpCommandPrinter c) == [(c, "")]
 
@@ -107,6 +107,70 @@ data SMTPReply = R500
                | R354
                | R554
                deriving (Ord, Eq, Show, Generic, NFData)
+
+instance Arbitrary SMTPReply where
+  arbitrary = oneof [ return R500 
+                    , return R501
+                    , return R502
+                    , return R503
+                    , return R504
+                    , return R211
+                    , return R214
+                    , R220 <$> listOf (elements $ ['a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9'] ++ ":/.")
+                    , R221 <$> listOf (elements $ ['a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9'] ++ ":/.")
+                    , R421 <$> listOf (elements $ ['a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9'] ++ ":/.")
+                    , return R250 
+                    , R251 <$> listOf (elements $ ['a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9'] ++ ":/.")
+                    , return R450
+                    , return R550
+                    , return R451
+                    , R551 <$> listOf (elements $ ['a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9'] ++ ":/.") 
+                    , return R452
+                    , return R552
+                    , return R553
+                    , return R354
+                    , return R554 ]
+
+smtpReplyParser :: ReadP SMTPReply
+smtpReplyParser = foldr (+++) pfail $ [ arged R220 "220"
+                                      , arged R221 "221"
+                                      , arged R421 "421"
+                                      , arged R251 "251"
+                                      , arged R551 "551" ]
+                                      ++ map (\c -> (string . drop 1 . show $ c) >> return c)
+                                           [ R500 
+                                           , R501
+                                           , R502
+                                           , R503
+                                           , R504
+                                           , R211
+                                           , R214
+                                           , R250 
+                                           , R450
+                                           , R550
+                                           , R451
+                                           , R452
+                                           , R552
+                                           , R553
+                                           , R354
+                                           , R554 ]
+  where
+    arged con name = do
+      string name
+      skipSpaces
+      con <$> manyTill P.get eof
+
+smtpReplyPrinter :: SMTPReply -> String
+smtpReplyPrinter c = case c of
+  R220 s -> "220 " ++ s
+  R221 s -> "221 " ++ s
+  R421 s -> "421 " ++ s
+  R251 s -> "251 " ++ s
+  R551 s -> "551 " ++ s
+  _      -> drop 1 $ show c
+
+prop_print_parse_reply :: SMTPReply -> Bool
+prop_print_parse_reply c = (readP_to_S smtpReplyParser) (smtpReplyPrinter c) == [(c, "")]
 
 heloMessage :: Predicate SMTPCommand 
 heloMessage = Predicate { apply = \c -> case c of
