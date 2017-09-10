@@ -8,6 +8,8 @@ import GHC.Generics
 import Control.Monad
 import Test.QuickCheck
 import Control.DeepSeq
+import Text.ParserCombinators.ReadP hiding (get)
+import qualified Text.ParserCombinators.ReadP as P
 
 import SessionCheck
 
@@ -16,21 +18,72 @@ type Domain = String
 type ForwardPath = String
 type ReversePath = ForwardPath 
 
+-- Minimal subset of SMTP
 data SMTPCommand = HELO Domain
                  | MAIL_FROM ReversePath
                  | RCPT_TO ForwardPath
                  | DATA
                  | RSET
-                 | SEND_FROM ReversePath
-                 | SOML_FROM ReversePath
-                 | SAML_FROM ReversePath
-                 | VRFY String
-                 | EXPN String
-                 | HELP (Maybe String)
                  | NOOP
                  | QUIT
-                 | TURN
                  deriving (Ord, Eq, Show, Generic, NFData)
+
+smtpCommandParser :: ReadP SMTPCommand
+smtpCommandParser = foldr (+++) pfail [ heloParser
+                                      , mailFromParser
+                                      , rcptToParser
+                                      , dataParser
+                                      , rsetParser
+                                      , noopParser
+                                      , quitParser ]
+  where
+    heloParser = do
+      string "HELO"
+      skipSpaces
+      HELO <$> manyTill P.get eof
+    mailFromParser = do
+      string "MAIL FROM:"
+      skipSpaces
+      MAIL_FROM <$> manyTill P.get eof
+    rcptToParser = do
+      string "RCPT TO:"
+      skipSpaces
+      RCPT_TO <$> manyTill P.get eof
+    dataParser = do
+      string "DATA"
+      eof
+      return DATA
+    rsetParser = do
+      string "RSET"
+      eof
+      return RSET
+    noopParser = do
+      string "NOOP"
+      eof
+      return NOOP
+    quitParser = do
+      string "QUIT"
+      eof
+      return QUIT
+
+smtpCommandPrinter :: SMTPCommand -> String
+smtpCommandPrinter c = case c of
+  HELO d       -> "HELO " ++ d
+  MAIL_FROM rp -> "MAIL FROM: " ++ rp
+  RCPT_TO fp   -> "RCPT TO: " ++ fp 
+  _            -> show c
+
+instance Arbitrary SMTPCommand where
+  arbitrary = oneof [ HELO      <$> listOf (elements $ ['a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9'] ++ ":/.")
+                    , MAIL_FROM <$> listOf (elements $ ['a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9'] ++ ":/.")
+                    , RCPT_TO   <$> listOf (elements $ ['a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9'] ++ ":/.")
+                    , return DATA
+                    , return RSET
+                    , return NOOP
+                    , return QUIT ]
+
+prop_print_parse_command :: SMTPCommand -> Bool
+prop_print_parse_command c = (readP_to_S smtpCommandParser) (smtpCommandPrinter c) == [(c, "")]
 
 data SMTPReply = R500 
                | R501
