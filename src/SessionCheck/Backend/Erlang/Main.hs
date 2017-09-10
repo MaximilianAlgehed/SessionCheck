@@ -66,7 +66,7 @@ runFun imp@(Imp readChan writeChan _ _ done _) opts = do
               toErlang
         loop mbox
 
-erlangMain :: String -- ^ On the form "moduleName:functionName"
+erlangMain :: String         -- ^ On the form "moduleName:functionName"
            -> Spec ErlType a -- ^ The specification
            -> IO ()
 erlangMain modfun spec = do
