@@ -1,7 +1,8 @@
 {-# LANGUAGE TypeOperators
            , FlexibleContexts
            , DeriveGeneric
-           , DeriveAnyClass #-}
+           , DeriveAnyClass
+           , MultiParamTypeClasses #-}
 module SMTP where
 
 import GHC.Generics
@@ -12,6 +13,7 @@ import Text.ParserCombinators.ReadP hiding (get)
 import qualified Text.ParserCombinators.ReadP as P
 
 import SessionCheck
+import SessionCheck.Backend.TCP
 
 -- Approximations
 type Domain = String
@@ -84,6 +86,12 @@ smtpCommandPrinter c = case c of
 
 prop_print_parse_command :: SMTPCommand -> Bool
 prop_print_parse_command c = (readP_to_S smtpCommandParser) (smtpCommandPrinter c) == [(c, "")]
+
+instance SMTPCommand :< TCPMessage where
+  inj = TCPMessage . smtpCommandPrinter
+  prj m = case readP_to_S smtpCommandParser (unTCPMessage m) of
+    [(c, "")] -> Just c
+    _         -> Nothing
 
 data SMTPReply = R500 
                | R501
@@ -170,7 +178,13 @@ smtpReplyPrinter c = case c of
   _      -> drop 1 $ show c
 
 prop_print_parse_reply :: SMTPReply -> Bool
-prop_print_parse_reply c = (readP_to_S smtpReplyParser) (smtpReplyPrinter c) == [(c, "")]
+prop_print_parse_reply c = readP_to_S smtpReplyParser (smtpReplyPrinter c) == [(c, "")]
+
+instance SMTPReply :< TCPMessage where
+  inj = TCPMessage . smtpReplyPrinter
+  prj m = case readP_to_S smtpReplyParser (unTCPMessage m) of
+    [(r, "")] -> Just r
+    _         -> Nothing
 
 heloMessage :: Predicate SMTPCommand 
 heloMessage = Predicate { apply = \c -> case c of
