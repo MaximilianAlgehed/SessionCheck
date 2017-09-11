@@ -3,6 +3,7 @@ module SessionCheck.Predicate where
 
 import Test.QuickCheck
 import Data.List
+import Data.Char
 
 import SessionCheck.Classes
 
@@ -98,3 +99,9 @@ anyOf ps = Predicate { apply     = (\a -> any (flip apply a) ps)
                      , satisfies = oneof (satisfies <$> ps)
                      , shrunk    = \a -> oneof (flip shrunk a <$> ps)
                      , name      = "anyOf [" ++ intercalate "," (map name ps) ++ "]" }
+
+alphaNumString :: Predicate String
+alphaNumString = Predicate { apply     = all isAlphaNum
+                           , satisfies = listOf . elements $ ['a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9']
+                           , shrunk    = elements . shrink
+                           , name      = "alphaNumString" }

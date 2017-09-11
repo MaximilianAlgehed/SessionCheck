@@ -4,7 +4,10 @@ module SessionCheck.Backend.TCP.Main ( tcpMain )where
 import SessionCheck.Spec (Spec)
 import SessionCheck.Backend
 import SessionCheck.Backend.TCP.Types
+import SessionCheck.Types
+import SessionCheck.Test
 
+import Prelude hiding (read)
 import qualified Data.ByteString as BS
 import Data.ByteString.Internal (c2w, w2c)
 import Network.Simple.TCP
@@ -51,31 +54,42 @@ read s = go BS.empty >>= return . fmap (TCPMessage . reverse . unpack)
           else
             go (BS.append bs b)
 
-data Options = Options { program :: String } deriving (Ord, Eq, Show)
+data Options = Options { program :: String
+                       , port    :: String } deriving (Ord, Eq, Show)
 
 runFun :: Options
        -> Implementation TCPMessage
        -> IO ()
 runFun opts imp = do
   ph <- spawnCommand $ program opts ++ " > /dev/null"
-  readTid <- listen (Host "localhost") "8080" $ \(sock, sockAdr) -> do
-    readTid <- forkIO $ readThread imp
-    loop imp
+  readTid <- listen (Host "localhost") (port opts) $ \(sock, sockAdr) -> do
+    readTid <- forkIO $ readThread sock
+    loop sock
     return readTid
   terminateProcess ph
   killThread readTid
   putMVar (done imp) ()
   where
     -- Do the reading
-    readThread imp = return ()
+    readThread sock = do
+      m <- read sock
+      maybe (kill imp (Timeout "Process died")) (atomically . writeTChan (inputChan imp)) m
+      readThread sock
     -- Do the writing
-    loop imp = return ()
-  
+    loop sock = do
+      d <- isDead imp
+      unless d $ do
+        toTCP <- timeout 1000 $ atomically $ readTChan (outputChan imp)
+        maybe (return ())
+              (write sock) 
+              toTCP
+        loop sock 
 
--- TODO: Implement
 tcpMain :: String            -- Program to run
         -> Int               -- Port number
         -> Spec TCPMessage a -- Specification
         -> IO ()
-tcpMain prog port spec = do
-  return ()
+tcpMain prog prt spec = do
+  let opts = Options { program = prog, port = show prt }
+  imp <- clean 
+  sessionCheck (imp { run = runFun opts imp }) spec
