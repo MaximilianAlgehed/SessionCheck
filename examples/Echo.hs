@@ -16,3 +16,6 @@ echo = do
   s <- send alphaNumString
   get (is s)
   return ()
+
+main :: IO ()
+main = tcpMain "Echo.py" 10000 echo
