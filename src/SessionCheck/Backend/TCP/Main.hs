@@ -75,7 +75,7 @@ runFun opts imp = do
       return ph
     Client -> do
       ph <- spawnCommand $ program opts ++ " > /dev/null"
-      threadDelay 100
+      threadDelay 10000
       (s, a) <- connectSock "127.0.0.1" (port opts)
       readTid <- forkIO $ readThread s
       loop s 
@@ -113,6 +113,10 @@ tcpMain r prog prt spec = do
               N.listen s 1
               return (Just s)
             _ -> return Nothing
-  let opts = Options { program = prog, port = show prt, role = r, socket = sock}
+  let opts = Options { program = prog
+                     , port = show prt
+                     , role = r
+                     , socket = sock}
   imp <- clean 
   sessionCheck (imp { run = runFun opts imp }) spec
+  maybe (return ()) closeSock sock
