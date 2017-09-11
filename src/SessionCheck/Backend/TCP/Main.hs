@@ -57,7 +57,8 @@ read s = go BS.empty >>= return . fmap (TCPMessage . unpack)
 
 data Options = Options { program :: String
                        , port    :: String
-                       , role    :: ProtocolRole } deriving (Ord, Eq, Show)
+                       , role    :: ProtocolRole
+                       , socket  :: Maybe Socket }
 
 runFun :: Options
        -> Implementation TCPMessage
@@ -65,13 +66,12 @@ runFun :: Options
 runFun opts imp = do
   ph <- case role opts of
     Server -> do
-      (s, a) <- bindSock (Host "127.0.0.1") (port opts)
-      N.listen s 1
+      let Just s = socket opts
       ph <- spawnCommand $ program opts ++ " > /dev/null"
-      accept s $ \(sock, sockAdr) -> do
-        readTid <- forkIO $ readThread sock
-        loop sock
-        killThread readTid
+      (sock, sockAdr) <- N.accept s
+      readTid <- forkIO $ readThread sock
+      loop sock
+      killThread readTid
       return ph
     Client -> do
       ph <- spawnCommand $ program opts ++ " > /dev/null"
@@ -107,6 +107,12 @@ tcpMain :: ProtocolRole
         -> Spec TCPMessage a -- Specification
         -> IO ()
 tcpMain r prog prt spec = do
-  let opts = Options { program = prog, port = show prt, role = r }
+  sock <- case r of
+            Server -> do
+              (s, a) <- bindSock (Host "127.0.0.1") (show prt)
+              N.listen s 1
+              return (Just s)
+            _ -> return Nothing
+  let opts = Options { program = prog, port = show prt, role = r, socket = sock}
   imp <- clean 
   sessionCheck (imp { run = runFun opts imp }) spec
