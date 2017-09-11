@@ -39,6 +39,7 @@ read s = go BS.empty >>= return . fmap (TCPMessage . reverse . unpack)
   where
     go bs = do
       mb <- recv s 1
+      print mb -- DEBUG
       case mb of
         Nothing -> return Nothing
         Just b  ->
@@ -55,14 +56,18 @@ read s = go BS.empty >>= return . fmap (TCPMessage . reverse . unpack)
             go (BS.append bs b)
 
 data Options = Options { program :: String
-                       , port    :: String } deriving (Ord, Eq, Show)
+                       , port    :: String
+                       , role    :: ProtocolRole } deriving (Ord, Eq, Show)
 
 runFun :: Options
        -> Implementation TCPMessage
        -> IO ()
 runFun opts imp = do
   ph <- spawnCommand $ program opts ++ " > /dev/null"
-  readTid <- listen (Host "localhost") (port opts) $ \(sock, sockAdr) -> do
+  let action = case role opts of
+                Server -> listen (Host "localhost")
+                Client -> connect "localhost"
+  readTid <- action (port opts) $ \(sock, sockAdr) -> do
     readTid <- forkIO $ readThread sock
     loop sock
     return readTid
@@ -75,6 +80,7 @@ runFun opts imp = do
       m <- read sock
       maybe (kill imp (Timeout "Process died")) (atomically . writeTChan (inputChan imp)) m
       readThread sock
+
     -- Do the writing
     loop sock = do
       d <- isDead imp
@@ -85,11 +91,12 @@ runFun opts imp = do
               toTCP
         loop sock 
 
-tcpMain :: String            -- Program to run
+tcpMain :: ProtocolRole
+        -> String            -- Program to run
         -> Int               -- Port number
         -> Spec TCPMessage a -- Specification
         -> IO ()
-tcpMain prog prt spec = do
-  let opts = Options { program = prog, port = show prt }
+tcpMain r prog prt spec = do
+  let opts = Options { program = prog, port = show prt, role = r }
   imp <- clean 
   sessionCheck (imp { run = runFun opts imp }) spec

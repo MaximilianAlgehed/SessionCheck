@@ -18,4 +18,4 @@ echo = do
   return ()
 
 main :: IO ()
-main = tcpMain "Echo.py" 10000 echo
+main = tcpMain Server "python Echo.py" 10000 (dual echo)
