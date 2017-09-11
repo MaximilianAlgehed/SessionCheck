@@ -11,6 +11,7 @@ import Prelude hiding (read)
 import qualified Data.ByteString as BS
 import Data.ByteString.Internal (c2w, w2c)
 import Network.Simple.TCP
+import qualified Network.Socket as N
 import Control.Concurrent.STM
 import Control.Concurrent
 import Control.Concurrent.MVar
@@ -35,11 +36,10 @@ write s = send s . pack . (++"\r\n") . unTCPMessage
 -- Read a message from a socket, works by incrementally reading individual
 -- bytes until it encounters a <CR><LF> pair
 read :: Socket -> IO (Maybe TCPMessage)
-read s = go BS.empty >>= return . fmap (TCPMessage . reverse . unpack)
+read s = go BS.empty >>= return . fmap (TCPMessage . unpack)
   where
     go bs = do
       mb <- recv s 1
-      print mb -- DEBUG
       case mb of
         Nothing -> return Nothing
         Just b  ->
@@ -63,16 +63,26 @@ runFun :: Options
        -> Implementation TCPMessage
        -> IO ()
 runFun opts imp = do
-  ph <- spawnCommand $ program opts ++ " > /dev/null"
-  let action = case role opts of
-                Server -> listen (Host "localhost")
-                Client -> connect "localhost"
-  readTid <- action (port opts) $ \(sock, sockAdr) -> do
-    readTid <- forkIO $ readThread sock
-    loop sock
-    return readTid
+  ph <- case role opts of
+    Server -> do
+      (s, a) <- bindSock (Host "127.0.0.1") (port opts)
+      N.listen s 1
+      ph <- spawnCommand $ program opts ++ " > /dev/null"
+      accept s $ \(sock, sockAdr) -> do
+        readTid <- forkIO $ readThread sock
+        loop sock
+        killThread readTid
+      return ph
+    Client -> do
+      ph <- spawnCommand $ program opts ++ " > /dev/null"
+      threadDelay 100
+      (s, a) <- connectSock "127.0.0.1" (port opts)
+      readTid <- forkIO $ readThread s
+      loop s 
+      killThread readTid
+      closeSock s
+      return ph
   terminateProcess ph
-  killThread readTid
   putMVar (done imp) ()
   where
     -- Do the reading
