@@ -64,7 +64,7 @@ runFun :: Options
        -> Implementation TCPMessage
        -> IO ()
 runFun opts imp = do
-  ph <- case role opts of
+  case role opts of
     Server -> do
       let Just s = socket opts
       ph <- spawnCommand $ program opts ++ " > /dev/null"
@@ -72,17 +72,13 @@ runFun opts imp = do
       readTid <- forkIO $ readThread sock
       loop sock
       killThread readTid
-      return ph
+      terminateProcess ph
     Client -> do
-      ph <- spawnCommand $ program opts ++ " > /dev/null"
-      threadDelay 10000
       (s, a) <- connectSock "127.0.0.1" (port opts)
       readTid <- forkIO $ readThread s
       loop s 
       killThread readTid
       closeSock s
-      return ph
-  terminateProcess ph
   putMVar (done imp) ()
   where
     -- Do the reading
@@ -107,16 +103,20 @@ tcpMain :: ProtocolRole
         -> Spec TCPMessage a -- Specification
         -> IO ()
 tcpMain r prog prt spec = do
-  sock <- case r of
-            Server -> do
-              (s, a) <- bindSock (Host "127.0.0.1") (show prt)
-              N.listen s 1
-              return (Just s)
-            _ -> return Nothing
+  (sock, ph) <- case r of
+                   Server -> do
+                     (s, a) <- bindSock (Host "127.0.0.1") (show prt)
+                     N.listen s 1
+                     return (Just s, Nothing)
+                   Client -> do
+                    ph <- spawnCommand $ prog ++ " > /dev/null"
+                    threadDelay 1000000
+                    return (Nothing, Just ph)
   let opts = Options { program = prog
                      , port = show prt
                      , role = r
-                     , socket = sock}
+                     , socket = sock }
   imp <- clean 
   sessionCheck (imp { run = runFun opts imp }) spec
   maybe (return ()) closeSock sock
+  maybe (return ()) terminateProcess ph

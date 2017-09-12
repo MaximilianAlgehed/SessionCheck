@@ -20,4 +20,4 @@ echo = do
 main :: IO ()
 main = do
   tcpMain Server "python EchoClient.py" 10000 (dual echo)
-  --tcpMain Client "python EchoServer.py" 10001 echo
+  tcpMain Client "python EchoServer.py" 10002 echo
