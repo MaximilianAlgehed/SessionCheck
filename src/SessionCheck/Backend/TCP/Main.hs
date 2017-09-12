@@ -68,10 +68,14 @@ runFun opts imp = do
     Server -> do
       let Just s = socket opts
       ph <- spawnCommand $ program opts ++ " > /dev/null"
-      (sock, sockAdr) <- N.accept s
-      readTid <- forkIO $ readThread sock
-      loop sock
-      killThread readTid
+      ms <- timeout 1000000 (N.accept s)
+      case ms of
+        Just (s, _) -> do
+          readTid <- forkIO $ readThread s
+          loop s
+          killThread readTid
+        Nothing -> do
+          putStrLn "No connection!"
       terminateProcess ph
     Client -> do
       (s, a) <- connectSock "127.0.0.1" (port opts)

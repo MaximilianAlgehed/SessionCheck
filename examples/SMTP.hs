@@ -20,8 +20,12 @@ type Domain = String
 type ForwardPath = String
 type ReversePath = ForwardPath 
 
+niceString :: Gen String
+niceString = listOf (elements $ ['a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9'] ++ ":/.")
+
 -- Minimal subset of SMTP
 data SMTPCommand = HELO Domain
+                 | EHLO Domain
                  | MAIL_FROM ReversePath
                  | RCPT_TO ForwardPath
                  | DATA
@@ -31,9 +35,10 @@ data SMTPCommand = HELO Domain
                  deriving (Ord, Eq, Show, Generic, NFData)
 
 instance Arbitrary SMTPCommand where
-  arbitrary = oneof [ HELO      <$> listOf (elements $ ['a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9'] ++ ":/.")
-                    , MAIL_FROM <$> listOf (elements $ ['a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9'] ++ ":/.")
-                    , RCPT_TO   <$> listOf (elements $ ['a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9'] ++ ":/.")
+  arbitrary = oneof [ HELO      <$> niceString
+                    , HELO      <$> niceString
+                    , MAIL_FROM <$> niceString 
+                    , RCPT_TO   <$> niceString 
                     , return DATA
                     , return RSET
                     , return NOOP
@@ -41,6 +46,7 @@ instance Arbitrary SMTPCommand where
 
 smtpCommandParser :: ReadP SMTPCommand
 smtpCommandParser = foldr (+++) pfail [ heloParser
+                                      , ehloParser
                                       , mailFromParser
                                       , rcptToParser
                                       , dataParser
@@ -49,37 +55,42 @@ smtpCommandParser = foldr (+++) pfail [ heloParser
                                       , quitParser ]
   where
     heloParser = do
-      string "HELO"
+      string "HELO" +++ string "helo"
       skipSpaces
       HELO <$> manyTill P.get eof
+    ehloParser = do
+      string "EHLO" +++ string "ehlo"
+      skipSpaces
+      EHLO <$> manyTill P.get eof
     mailFromParser = do
-      string "MAIL FROM:"
+      string "MAIL FROM:" +++ string "mail FROM:"
       skipSpaces
       MAIL_FROM <$> manyTill P.get eof
     rcptToParser = do
-      string "RCPT TO:"
+      string "RCPT TO:" +++ string "rcpt TO:"
       skipSpaces
       RCPT_TO <$> manyTill P.get eof
     dataParser = do
-      string "DATA"
+      string "DATA" +++ string "data"
       eof
       return DATA
     rsetParser = do
-      string "RSET"
+      string "RSET" +++ string "rset"
       eof
       return RSET
     noopParser = do
-      string "NOOP"
+      string "NOOP" +++ string "noop"
       eof
       return NOOP
     quitParser = do
-      string "QUIT"
+      string "QUIT" +++ string "quit"
       eof
       return QUIT
 
 smtpCommandPrinter :: SMTPCommand -> String
 smtpCommandPrinter c = case c of
   HELO d       -> "HELO " ++ d
+  EHLO d       -> "EHLO " ++ d
   MAIL_FROM rp -> "MAIL FROM: " ++ rp
   RCPT_TO fp   -> "RCPT TO: " ++ fp 
   _            -> show c
@@ -190,15 +201,23 @@ heloMessage :: Predicate SMTPCommand
 heloMessage = Predicate { apply = \c -> case c of
                                           HELO _ -> True
                                           _      -> False
-                        , satisfies = HELO <$> arbitrary
+                        , satisfies = HELO <$> niceString
                         , shrunk    = \(HELO d) -> elements (HELO <$> shrink d)
                         , name      = "heloMessage" }
+
+ehloMessage :: Predicate SMTPCommand 
+ehloMessage = Predicate { apply = \c -> case c of
+                                          EHLO _ -> True
+                                          _      -> False
+                        , satisfies = EHLO <$> niceString 
+                        , shrunk    = \(EHLO d) -> elements (EHLO <$> shrink d)
+                        , name      = "ehloMessage" }
 
 mailMessage :: Predicate SMTPCommand
 mailMessage = Predicate { apply = \c -> case c of
                                           MAIL_FROM _ -> True
                                           _           -> False
-                        , satisfies = MAIL_FROM <$> arbitrary
+                        , satisfies = MAIL_FROM <$> niceString 
                         , shrunk    = \(MAIL_FROM d) -> elements (MAIL_FROM <$> shrink d)
                         , name      = "mailMessage" }
 
@@ -206,7 +225,7 @@ rcptMessage :: Predicate SMTPCommand
 rcptMessage = Predicate { apply = \c -> case c of
                                           RCPT_TO _ -> True
                                           _         -> False
-                        , satisfies = RCPT_TO <$> arbitrary
+                        , satisfies = RCPT_TO <$> niceString 
                         , shrunk    = \(RCPT_TO d) -> elements (RCPT_TO <$> shrink d)
                         , name      = "rcptMessage" }
 
@@ -219,10 +238,11 @@ endOfMail = Predicate { apply     = (==".")
                       , shrunk    = \_ -> return []
                       , name      = "endOfMail" }
 
-mail :: (String :< t, SMTPReply :< t, SMTPCommand :< t) => Spec t SMTPReply
+mail :: (String :< t, SMTPReply :< t, SMTPCommand :< t) => Spec t ()
 mail = do
-  msg <- get $ anyOf [ rcptMessage, dataMessage ]
+  msg <- get $ anyOf [ rcptMessage, dataMessage, is RSET]
   case msg of
+    RSET -> stop
     RCPT_TO _ -> do
       send $ anyOf [is R250, is R550]
       mail
@@ -230,26 +250,43 @@ mail = do
       send $ is R354
       dataRecv
 
-dataRecv :: (String :< t, SMTPReply :< t) => Spec t SMTPReply
+dataRecv :: (String :< t, SMTPReply :< t) => Spec t ()
 dataRecv = do
   line <- get $ anyOf [ anything, is "." ]
   case line of
-    "." -> send $ is R250
+    "." -> void . send $ is R250
     _   -> dataRecv
+
+handshakeRFC821 :: (SMTPCommand :< t, SMTPReply :< t) => Spec t ()
+handshakeRFC821 = void $ do
+  -- Handshake
+  send heloMessage
+  get  (is R250) -- Approximation
+  get  heloMessage
+  send (is R250) -- Approximation
+
+handshakeRFC5321 :: (SMTPCommand :< t, SMTPReply :< t) => Spec t ()
+handshakeRFC5321 = void $ do
+  send heloMessage
+  get  ehloMessage
+  send (is R250)
 
 smtp :: (String :< t, SMTPReply :< t, SMTPCommand :< t) => Spec t ()
 smtp = do
-  -- Handshake
-  get  heloMessage
-  send (is R250) -- Approximation
-  send heloMessage
-  get  (is R250) -- Approximation
+  -- Perform the handshake
+  handshakeRFC5321
+  loop
+  where
+    loop = do
+      -- Choice of operations
+      op <- get $ anyOf [ mailMessage, is QUIT, is RSET]
+      case op of
+        RSET -> stop
+        MAIL_FROM _ -> do
+          send (is R250) -- Approximation
+          mail
+          loop
+        QUIT        -> stop
 
-  -- Choice of operations
-  op <- get $ anyOf [ mailMessage, is QUIT ]
-  case op of
-    MAIL_FROM _ -> do
-      send (is R250) -- Approximation
-      mail
-      smtp
-    QUIT        -> stop
+main :: IO ()
+main = tcpMain Server "python SMTP.py 2> /dev/null < mail.txt" 252525 smtp
