@@ -103,6 +103,12 @@ tcpMain :: ProtocolRole
         -> Spec TCPMessage a -- Specification
         -> IO ()
 tcpMain r prog prt spec = do
+  (_, toKill, _) <- readCreateProcessWithExitCode
+                      (shell $ "fuser 2>/dev/null " ++ show prt ++ "/tcp") ""
+  unless (null $ words toKill) $ do
+    killer <- spawnCommand $ "kill " ++ toKill 
+    void $ waitForProcess killer
+  threadDelay 100000
   (sock, ph) <- case r of
                    Server -> do
                      (s, a) <- bindSock (Host "127.0.0.1") (show prt)
