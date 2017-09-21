@@ -7,7 +7,7 @@ import SessionCheck.Backend.Erlang
 
 bookShop :: (Int :< t, String :< t, [Int] :< t) => [Int] -> Spec t ()
 bookShop books = do 
-  b <- send anyInt
+  b <- send posInt --anyInt
   let books' = b : books
 
   choice <- choose ["another", "request"]

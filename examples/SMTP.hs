@@ -274,6 +274,7 @@ handshakeRFC5321 = void $ do
 smtp :: (String :< t, SMTPReply :< t, SMTPCommand :< t) => Spec t ()
 smtp = do
   -- Perform the handshake
+  --handshakeRFC821
   handshakeRFC5321
   loop
   where
