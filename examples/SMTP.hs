@@ -229,6 +229,15 @@ rcptMessage = Predicate { apply = \c -> case c of
                         , shrunk    = \(RCPT_TO d) -> elements (RCPT_TO <$> shrink d)
                         , name      = "rcptMessage" }
 
+r220Message :: Predicate SMTPReply
+r220Message = Predicate { apply = \c -> case c of
+                                          R220 _ -> True
+                                          _         -> False
+                        , satisfies = R220 <$> niceString 
+                        , shrunk    = \(R220 d) -> elements (R220 <$> shrink d)
+                        , name      = "r220Message" }
+
+
 dataMessage :: Predicate SMTPCommand
 dataMessage = (is DATA) { name = "dataMessage" }
 
@@ -260,6 +269,7 @@ dataRecv = do
 handshakeRFC821 :: (SMTPCommand :< t, SMTPReply :< t) => Spec t ()
 handshakeRFC821 = void $ do
   -- Handshake
+  send r220Message --Something is strange here. Need to read the RFC carefully
   send heloMessage
   get  (is R250) -- Approximation
   get  heloMessage
@@ -274,8 +284,8 @@ handshakeRFC5321 = void $ do
 smtp :: (String :< t, SMTPReply :< t, SMTPCommand :< t) => Spec t ()
 smtp = do
   -- Perform the handshake
-  --handshakeRFC821
-  handshakeRFC5321
+  handshakeRFC821
+  --handshakeRFC5321
   loop
   where
     loop = do
@@ -290,4 +300,6 @@ smtp = do
         QUIT        -> stop
 
 main :: IO ()
-main = tcpMain Server "python SMTP.py 2> /dev/null < mail.txt" 252525 smtp
+main = do
+  tcpMain Server "python SMTP.py 2> /dev/null < mail.txt" 252525 smtp
+  tcpMain Client "python SMTPServer.py" 1025 (dual smtp)
