@@ -1,4 +1,7 @@
-{-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE TypeOperators
+           , FlexibleInstances
+           , FlexibleContexts
+           , MultiParamTypeClasses #-}
 module SessionCheck.Predicate where
 
 import Test.QuickCheck
@@ -13,6 +16,8 @@ data Predicate a =
             , satisfies :: Gen a
             , shrunk    :: a -> Gen a
             , name      :: String }
+
+
 
 -- Test if a `t` satisfies a predicate for `a`s when `a :< t`
 test :: a :< t => Predicate a -> t -> Bool
@@ -105,3 +110,21 @@ alphaNumString = Predicate { apply     = all isAlphaNum
                            , satisfies = listOf . elements $ ['a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9']
                            , shrunk    = elements . shrink
                            , name      = "alphaNumString" }
+
+data Unfailing t a = Failed t
+                   | OkValue a
+                   deriving (Ord, Eq, Show)
+
+instance a :< t => Unfailing t a :< t where
+  inj (Failed t)  = t
+  inj (OkValue a) = inj a
+
+  prj t = Just $ maybe (Failed t) OkValue (prj t)
+
+unfailing :: Arbitrary t => Predicate a -> Predicate (Unfailing t a)
+unfailing p = Predicate { apply     = \uf -> case uf of
+                                              Failed _  -> True
+                                              OkValue a -> apply p a
+                        , satisfies = oneof [ OkValue <$> satisfies p, Failed <$> arbitrary ]
+                        , shrunk    = error "Not yet implemented"
+                        , name      = "unfailing " ++ name p }

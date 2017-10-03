@@ -270,10 +270,11 @@ handshakeRFC821 :: (SMTPCommand :< t, SMTPReply :< t) => Spec t ()
 handshakeRFC821 = void $ do
   -- Handshake
   send r220Message --Something is strange here. Need to read the RFC carefully
-  send heloMessage
-  get  (is R250) -- Approximation
   get  heloMessage
   send (is R250) -- Approximation
+  send heloMessage
+  get  (is R250) -- Approximation
+  
 
 handshakeRFC5321 :: (SMTPCommand :< t, SMTPReply :< t) => Spec t ()
 handshakeRFC5321 = void $ do
@@ -286,18 +287,15 @@ smtp = do
   -- Perform the handshake
   handshakeRFC821
   --handshakeRFC5321
-  loop
-  where
-    loop = do
-      -- Choice of operations
-      op <- get $ anyOf [ mailMessage, is QUIT, is RSET]
-      case op of
-        RSET -> stop
-        MAIL_FROM _ -> do
-          send (is R250) -- Approximation
-          mail
-          loop
-        QUIT        -> stop
+  forever $ do
+    -- Choice of operations
+    op <- get $ anyOf [ mailMessage, is QUIT, is RSET]
+    case op of
+      RSET -> stop
+      MAIL_FROM _ -> do
+        send (is R250) -- Approximation
+        mail
+      QUIT        -> stop
 
 main :: IO ()
 main = do

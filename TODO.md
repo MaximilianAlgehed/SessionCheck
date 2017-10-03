@@ -1,11 +1,9 @@
 # TODO
 
-* Make sure to print the counterexample in the actual type of the message,
-  not in the format being transmitted (i.e. Dynamic gives "Output <<Int>>")
 * Implement shrinking
-* Implement subsumption testing, can a client running protocol A communicate
-  with a server using protocol B when A /= B
 * Implement mutation testing by MITM
+
+* Look at the contract entailment in Chaperone Contracts for Higher-Order Sessions
 
 * Think some more about the semantics of threads, having any possible
   interleaving be allowed can be very dangerous
