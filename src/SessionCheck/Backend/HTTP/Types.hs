@@ -11,7 +11,7 @@ data HTTPData = HTTP { httpMethod     :: String
 
 data Method = GET
             | POST
-            deriving (Ord, Eq, Show)
+            deriving (Ord, Eq, Show, Read)
 
 data HTTPMessage a = HTTPMessage { messageMethod     :: Method
                                  , messageUrl        :: String 
