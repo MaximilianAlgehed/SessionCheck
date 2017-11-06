@@ -22,6 +22,7 @@ library
                        SessionCheck.Backend,
                        SessionCheck.Backend.Erlang,
                        SessionCheck.Backend.TCP,
+                       SessionCheck.Backend.HTTP,
                        SessionCheck.Test,
                        SessionCheck.Types,
                        SessionCheck
@@ -34,7 +35,10 @@ library
                        SessionCheck.Backend.Coherence,
                        SessionCheck.Backend.TCP.Main,
                        SessionCheck.Backend.TCP.Types,
-                       SessionCheck.Backend.TCP.Instances
+                       SessionCheck.Backend.TCP.Instances,
+                       SessionCheck.Backend.HTTP.Main,
+                       SessionCheck.Backend.HTTP.Types,
+                       SessionCheck.Backend.HTTP.Instances
   build-depends:       base >= 4.7 && < 5,
                        erlang >= 0.2.2 && < 0.3,
                        mtl >= 2.2.1 && < 2.3,

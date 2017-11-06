@@ -1,5 +1,7 @@
 # TODO
 
+* Implement `fail`
+
 * Implement shrinking
 * Implement mutation testing by MITM
 
