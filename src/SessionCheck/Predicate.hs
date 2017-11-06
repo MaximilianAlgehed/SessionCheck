@@ -17,8 +17,6 @@ data Predicate a =
             , shrunk    :: a -> Gen a
             , name      :: String }
 
-
-
 -- Test if a `t` satisfies a predicate for `a`s when `a :< t`
 test :: a :< t => Predicate a -> t -> Bool
 test p t = maybe False id (apply p <$> prj t)

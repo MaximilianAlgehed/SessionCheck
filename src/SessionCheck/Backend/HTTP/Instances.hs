@@ -22,3 +22,13 @@ instance Arbitrary EmptyBody where
   arbitrary = return EmptyBody
 
   shrink _ = []
+
+instance Monoid HTTPDescriptor where
+  mempty = Desc Nothing Nothing Nothing
+
+  l `mappend` r = Desc (maybe (descMethod l) Just (descMethod r))
+                       (maybe (descUrl l) Just (descUrl r))
+                       (maybe (descParameters l) Just (descParameters r))
+
+instance Arbitrary Method where
+  arbitrary = elements [GET, POST]
