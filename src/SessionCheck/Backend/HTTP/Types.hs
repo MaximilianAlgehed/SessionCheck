@@ -7,4 +7,4 @@ data HTTPData = HTTP { httpMethod     :: String
                      , httpBody       :: String }
                      deriving (Ord, Eq, Show)
 
-data EmptyBody = Empty
+data EmptyBody = EmptyBody deriving (Ord, Eq, Show)

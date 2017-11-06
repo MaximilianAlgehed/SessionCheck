@@ -4,6 +4,8 @@
            , UndecidableInstances #-}
 module SessionCheck.Backend.HTTP.Instances where
 
+import Test.QuickCheck
+
 import SessionCheck.Backend.HTTP.Types
 
 class IsHTTPBody a where
@@ -15,3 +17,8 @@ instance IsHTTPBody EmptyBody where
 
   parseBody "" = Just EmptyBody
   parseBody _  = Nothing
+
+instance Arbitrary EmptyBody where
+  arbitrary = return EmptyBody
+
+  shrink _ = []

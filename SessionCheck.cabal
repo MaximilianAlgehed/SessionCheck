@@ -38,7 +38,8 @@ library
                        SessionCheck.Backend.TCP.Instances,
                        SessionCheck.Backend.HTTP.Main,
                        SessionCheck.Backend.HTTP.Types,
-                       SessionCheck.Backend.HTTP.Instances
+                       SessionCheck.Backend.HTTP.Instances,
+                       SessionCheck.Backend.HTTP.Predicates
   build-depends:       base >= 4.7 && < 5,
                        erlang >= 0.2.2 && < 0.3,
                        mtl >= 2.2.1 && < 2.3,
