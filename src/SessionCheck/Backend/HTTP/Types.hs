@@ -7,6 +7,4 @@ data HTTPData = HTTP { httpMethod     :: String
                      , httpBody       :: String }
                      deriving (Ord, Eq, Show)
 
-data RequestReply = Request HTTPData
-                  | Reply HTTPData
-                  deriving (Ord, Eq, Show)
+data EmptyBody = Empty

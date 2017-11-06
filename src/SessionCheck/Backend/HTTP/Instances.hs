@@ -5,16 +5,13 @@
 module SessionCheck.Backend.HTTP.Instances where
 
 import SessionCheck.Backend.HTTP.Types
-import SessionCheck.Classes
 
-class HTTPLike a where
-  request  :: a -> Bool
+class IsHTTPBody a where
+  body      :: a -> String
+  parseBody :: String -> Maybe a
 
-instance ( HTTPLike a
-         , a :< HTTPData ) => a :< RequestReply where
-  inj a
-    | request a = Request . inj $ a
-    | otherwise = Reply   . inj $ a
+instance IsHTTPBody EmptyBody where
+  body _ = ""
 
-  prj (Request d) = prj d
-  prj (Reply d)   = prj d
+  parseBody "" = Just EmptyBody
+  parseBody _  = Nothing
