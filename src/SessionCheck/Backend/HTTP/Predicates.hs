@@ -29,3 +29,19 @@ with p_body desc = Predicate app
     generator da = maybe arbitrary satisfies (da desc)
     
     testThe msg ma da = maybe True (flip apply (ma msg)) (da desc)
+
+infixr 8 `with`
+
+method :: Predicate Method -> HTTPDescriptor
+method p = mempty { descMethod = Just p }
+
+url :: Predicate String -> HTTPDescriptor
+url p = mempty { descUrl = Just p }
+
+parameters :: Predicate [(String, String)] -> HTTPDescriptor
+parameters p = mempty { descParameters = Just p }
+
+(<>) :: HTTPDescriptor -> HTTPDescriptor -> HTTPDescriptor
+(<>) = mappend
+
+infixr 9 <>

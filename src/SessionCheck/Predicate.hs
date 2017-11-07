@@ -96,6 +96,9 @@ is a = Predicate { apply     = (a==)
                  , shrunk    = \a -> return a
                  , name      = "is " ++ show a }
 
+are :: (Eq a, Show a) => [a] -> Predicate [a]
+are a = (is a) { name = "are " ++ show a }
+
 -- Accepts any predicate in the list
 anyOf :: [Predicate a] -> Predicate a
 anyOf ps = Predicate { apply     = (\a -> any (flip apply a) ps)
