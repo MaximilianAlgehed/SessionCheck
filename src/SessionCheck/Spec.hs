@@ -13,6 +13,7 @@ data Spec t a where
   Send   :: (a :< t, NFData a) => Predicate a -> Spec t a
   Async  :: Spec t a -> Spec t ()
   Stop   :: Spec t a
+  Fail   :: String -> Spec t a
   -- Monadic fragment
   Return :: a -> Spec t a
   Bind   :: Spec t a -> (a -> Spec t b) -> Spec t b
@@ -21,6 +22,7 @@ data Spec t a where
 instance Monad (Spec t) where
   return = Return
   (>>=)  = Bind
+  fail   = Fail
 
 instance Applicative (Spec t) where
   pure  = Return

@@ -243,6 +243,8 @@ stepThread (t@(Hide s c), mprev, success) = do
     Async t' -> mapM_ scheduleThread [hide t', hide (c ())]
 
     Stop -> return ()
+
+    Fail s -> throwError (Bad s)
     
     Return a -> scheduleThread (Hide (c a) (\_ -> Stop))
 
