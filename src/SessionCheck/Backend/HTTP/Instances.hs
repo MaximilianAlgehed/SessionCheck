@@ -25,26 +25,29 @@ instance Arbitrary EmptyBody where
 
   shrink _ = []
 
-instance Monoid HTTPDescriptor where
+instance Monoid (HTTPDescriptor s) where
   mempty = Desc Nothing Nothing Nothing
 
-  l `mappend` r = Desc (maybe (descMethod l) Just (descMethod r))
+  l `mappend` r = Desc (maybe (descStartLine l) Just (descStartLine r))
                        (maybe (descUrl l) Just (descUrl r))
                        (maybe (descParameters l) Just (descParameters r))
 
 instance Arbitrary Method where
   arbitrary = elements [GET, POST]
 
-instance IsHTTPBody a => HTTPMessage a :< HTTPData where
-  inj msg = HTTP { httpMethod     = show (messageMethod msg)
-                 , httpUrl        = messageUrl msg
-                 , httpParameters = messageParameters msg
-                 , httpBody       = body (messageBody msg) }
+instance Arbitrary Status where
+  arbitrary = StatusCode . abs <$> arbitrary
+
+instance IsHTTPBody a => HTTPRequest a :< HTTPData where
+  inj msg = HTTP { httpMethod     = show (requestMethod msg)
+                 , httpUrl        = requestUrl msg
+                 , httpParameters = requestParameters msg
+                 , httpBody       = body (requestBody msg) }
 
   prj http = do
     body   <- parseBody (httpBody http)
     method <- readMaybe (httpMethod http)
-    return $ HTTPMessage { messageMethod     = method
-                         , messageUrl        = httpUrl http
-                         , messageParameters = httpParameters http
-                         , messageBody       = body }
+    return $ HTTPRequest { requestMethod     = method
+                         , requestUrl        = httpUrl http
+                         , requestParameters = httpParameters http
+                         , requestBody       = body }

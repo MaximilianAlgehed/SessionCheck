@@ -1,4 +1,4 @@
-{-# LANGUAGE MultiParamTypeClasses, GADTs, DeriveAnyClass, DeriveGeneric #-}
+{-# LANGUAGE MultiParamTypeClasses, GADTs, DeriveAnyClass, DeriveGeneric, GeneralizedNewtypeDeriving #-}
 module SessionCheck.Backend.HTTP.Types where
 
 import Control.DeepSeq
@@ -16,14 +16,24 @@ data Method = GET
             | POST
             deriving (Ord, Eq, Show, Read, NFData, Generic)
 
-data HTTPMessage a = HTTPMessage { messageMethod     :: Method
-                                 , messageUrl        :: String 
-                                 , messageParameters :: [(String, String)]
-                                 , messageBody       :: a }
+newtype Status = StatusCode Int deriving (Ord, Eq, Show, NFData, Generic, Num)
+
+data HTTPRequest a = HTTPRequest { requestMethod     :: Method
+                                 , requestUrl        :: String 
+                                 , requestParameters :: [(String, String)]
+                                 , requestBody       :: a }
                                  deriving (Ord, Eq, Show, NFData, Generic)
 
-data HTTPDescriptor = Desc { descMethod     :: Maybe (Predicate Method)
-                           , descUrl        :: Maybe (Predicate String)
-                           , descParameters :: Maybe (Predicate [(String, String)]) }
+
+data HTTPReply a = HTTPReply { replyStatus     :: Status
+                             , replyParameters :: [(String, String)]
+                             , replyBody       :: a }
+                             deriving (Ord, Eq, Show, NFData, Generic)
+
+
+
+data HTTPDescriptor s = Desc { descStartLine  :: Maybe (Predicate s)
+                             , descUrl        :: Maybe (Predicate String)
+                             , descParameters :: Maybe (Predicate [(String, String)]) }
 
 data EmptyBody = EmptyBody deriving (Ord, Eq, Show, NFData, Generic)
