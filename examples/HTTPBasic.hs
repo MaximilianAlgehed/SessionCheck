@@ -8,4 +8,4 @@ protocol :: ( HTTPReply EmptyBody :< t
             , HTTPRequest EmptyBody :< t) => Spec t (HTTPReply EmptyBody)
 protocol = do
   send $ emptyBody `with` url (is "hello") <> method (is GET) <> parameters (are [])
-  get  $ emptyBody `with` status (is 200)
+  get  $ emptyBody `with` status (is $ StatusCode 200)

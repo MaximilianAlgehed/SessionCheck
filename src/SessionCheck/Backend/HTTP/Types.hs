@@ -16,7 +16,7 @@ data Method = GET
             | POST
             deriving (Ord, Eq, Show, Read, NFData, Generic)
 
-newtype Status = StatusCode Int deriving (Ord, Eq, Show, NFData, Generic, Num)
+newtype Status = StatusCode Int deriving (Ord, Eq, Show, NFData, Generic)
 
 data HTTPRequest a = HTTPRequest { requestMethod     :: Method
                                  , requestUrl        :: String 
