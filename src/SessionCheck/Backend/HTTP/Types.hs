@@ -1,4 +1,4 @@
-{-# LANGUAGE MultiParamTypeClasses, GADTs, DeriveAnyClass, DeriveGeneric, GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE MultiParamTypeClasses, GADTs, DeriveAnyClass, DeriveGeneric #-}
 module SessionCheck.Backend.HTTP.Types where
 
 import Control.DeepSeq
