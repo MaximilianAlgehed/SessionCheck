@@ -37,16 +37,3 @@ instance Arbitrary Method where
 
 instance Arbitrary Status where
   arbitrary = StatusCode . abs <$> arbitrary
-
-instance IsHTTPBody a => HTTPRequest a :< HTTPData where
-  inj msg = HTTP { httpMethod     = requestMethod msg
-                 , httpUrl        = requestUrl msg
-                 , httpHeaders = requestHeaders msg
-                 , httpBody       = body (requestBody msg) }
-
-  prj http = do
-    body   <- parseBody (httpBody http)
-    return $ HTTPRequest { requestMethod     = httpMethod http
-                         , requestUrl        = httpUrl http
-                         , requestHeaders = httpHeaders http
-                         , requestBody       = body }
