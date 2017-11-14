@@ -6,15 +6,41 @@ module SessionCheck.Backend.HTTP.Instances where
 
 import Test.QuickCheck
 import Text.Read
+import Data.Maybe
 
 import SessionCheck.Backend.HTTP.Types
 import SessionCheck.Classes
+
+class IsHTTPBody a where
+  body      :: a -> String
+  parseBody :: String -> Maybe a
+
+instance IsHTTPBody a => HTTPRequest a :< HTTPMessage where
+  inj = Request . fmap body
+
+  prj (Request r) = do
+    body' <- parseBody (requestBody r)
+    return (fmap (const body') r)
+  prj _ = Nothing
+
+instance IsHTTPBody a => HTTPReply a :< HTTPMessage where
+  inj = Reply . fmap body
+
+  prj (Reply r) = do
+    body' <- parseBody (replyBody r)
+    return (fmap (const body') r)
+  prj _ = Nothing
 
 instance IsHTTPBody EmptyBody where
   body _ = ""
 
   parseBody "" = Just EmptyBody
   parseBody _  = Nothing
+
+instance IsHTTPBody String where
+  body = id
+  
+  parseBody = Just 
 
 instance Arbitrary EmptyBody where
   arbitrary = return EmptyBody

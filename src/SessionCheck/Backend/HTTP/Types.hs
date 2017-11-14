@@ -10,13 +10,10 @@ data ProtocolRole = Client
                   | Server
                   deriving (Ord, Eq, Show)
 
-class IsHTTPBody a where
-  body      :: a -> String
-  parseBody :: String -> Maybe a
-
 data HTTPMessage where
-  Request :: IsHTTPBody a => HTTPRequest a -> HTTPMessage
+  Request :: HTTPRequest String -> HTTPMessage
   Reply   :: HTTPReply String -> HTTPMessage 
+  deriving Show
 
 data Method = GET
             | POST
@@ -30,10 +27,16 @@ data HTTPRequest a = HTTPRequest { requestMethod  :: Method
                                  , requestBody    :: a }
                                  deriving (Ord, Eq, Show, NFData, Generic)
 
+instance Functor HTTPRequest where
+  fmap f (HTTPRequest m u h a) = HTTPRequest m u h (f a)
+
 data HTTPReply a = HTTPReply { replyStatus  :: Status
                              , replyHeaders :: [(String, String)]
                              , replyBody    :: a }
                              deriving (Ord, Eq, Show, NFData, Generic)
+
+instance Functor HTTPReply where
+  fmap f (HTTPReply s h a) = HTTPReply s h (f a)
 
 data HTTPDescriptor s = Desc { descStartLine :: Maybe (Predicate s)
                              , descUrl       :: Maybe (Predicate String)

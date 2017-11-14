@@ -55,6 +55,16 @@ library
                        case-insensitive
   default-language:    Haskell2010
 
+executable HTTPBasicServer
+  hs-source-dirs: examples
+  main-is: HTTPBasicServer.hs
+  build-depends: base >= 4.7 && <5,
+                 servant-server >= 0.11 && < 0.13,
+                 wai,
+                 warp,
+                 mtl,
+                 servant-lucid
+
 source-repository head
   type:     git
   location: https://github.com/MaximilianAlgehed/SessionCheck2

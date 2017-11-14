@@ -2,6 +2,7 @@
 module SessionCheck.Backend.HTTP.Predicates where
 
 import Test.QuickCheck
+import Data.List
 
 import SessionCheck.Predicate
 import SessionCheck.Backend.HTTP.Types
@@ -46,8 +47,13 @@ instance With Status where
   with p_body desc = Predicate app
                                generate
                                (\_ -> fail "Not implemented")
-                               "Name not yet implemented"
+                               nm 
     where
+      nm = name (p_body) ++ " `with` " ++ intercalate "<>" [ s | Just s <- [ wrap "status"  (name <$> (descStartLine desc))
+                                                                           , wrap "headers" (name <$> (descHeaders desc)) ] ]
+      wrap s Nothing = Nothing
+      wrap s (Just s') = Just (s ++ " (" ++ s' ++ ")")
+
       app msg =  apply p_body (replyBody msg)
               && testThe msg replyStatus descStartLine
               && testThe msg replyHeaders descHeaders

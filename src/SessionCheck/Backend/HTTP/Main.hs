@@ -18,19 +18,19 @@ import SessionCheck.Backend.HTTP.Instances
 import SessionCheck.Backend
 import SessionCheck.Spec
 import SessionCheck.Types
+import SessionCheck.Test
 
 type Host = String
 
-issueRequest :: IsHTTPBody a
-             => Manager
+issueRequest :: Manager
              -> Host
-             -> HTTPRequest a
+             -> HTTPRequest String
              -> IO (HTTPReply String)
 issueRequest manager host req = do
   initRequest <- parseRequest $ host ++ "/" ++ requestUrl req
   let request = initRequest { method         = pack $ show (requestMethod req)
                             , requestHeaders = [ (mk (pack n), pack v) | (n, v) <- T.requestHeaders req ]
-                            , requestBody    = RequestBodyBS . pack . body . T.requestBody $ req
+                            , requestBody    = RequestBodyBS . pack . T.requestBody $ req
                             }
   response <- (fmap L.unpack) <$> httpLbs request manager
   return $ HTTPReply { replyBody    = responseBody response
@@ -45,6 +45,7 @@ runClient :: Options
 runClient opts imp = do
   manager <- newManager defaultManagerSettings
   loop manager
+  putMVar (done imp) ()
   where
     loop manager = do
       d <- isDead imp
@@ -58,3 +59,13 @@ runClient opts imp = do
           Just (Reply _) -> (kill imp (Bad "Specification does not follow request-reply structure"))
           _ -> loop manager
 
+httpMain :: ProtocolRole
+        -> Host -- Host to either test or bind to
+        -> Spec HTTPMessage a -- Specification
+        -> IO ()
+httpMain r h spec = case r of
+  Server -> putStrLn "Server mocking is not yet implemented"
+  Client -> do
+    let opts = Options { host = h }
+    imp <- clean 
+    sessionCheck (imp { run = runClient opts imp }) spec

@@ -4,8 +4,8 @@ module HTTPBasic where
 import SessionCheck
 import SessionCheck.Backend.HTTP
 
-protocol :: ( HTTPReply EmptyBody :< t
-            , HTTPRequest EmptyBody :< t) => Spec t (HTTPReply EmptyBody)
+protocol :: ( HTTPReply String :< t
+            , HTTPRequest EmptyBody :< t) => Spec t (HTTPReply String)
 protocol = do
-  send $ emptyBody `with` url (is "hello") <> method (is GET) <> parameters (are [])
-  get  $ emptyBody `with` status (is $ StatusCode 200)
+  send $ emptyBody `with` url (is "hello") <> method (is GET)
+  get  $ (is "hello") `with` status (is $ StatusCode 200)
