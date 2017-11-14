@@ -10,10 +10,6 @@ import Text.Read
 import SessionCheck.Backend.HTTP.Types
 import SessionCheck.Classes
 
-class IsHTTPBody a where
-  body      :: a -> String
-  parseBody :: String -> Maybe a
-
 instance IsHTTPBody EmptyBody where
   body _ = ""
 

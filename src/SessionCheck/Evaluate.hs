@@ -250,7 +250,6 @@ stepThread (t@(Hide s c), mprev, success) = do
 
     Bind s f -> scheduleThread (Hide s (\a -> f a >>= c))
 
--- TODO: Implement
 generateTimeoutShrink :: (a :< t, NFData a) => Predicate a -> Maybe t -> EvalM t a
 generateTimeoutShrink p mprev = generateTimeout p
 
