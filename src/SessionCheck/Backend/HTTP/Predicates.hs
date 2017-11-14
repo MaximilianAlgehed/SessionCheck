@@ -26,12 +26,12 @@ instance With Method where
       app msg =  apply p_body (requestBody msg)
               && testThe msg requestMethod descStartLine
               && testThe msg requestUrl descUrl
-              && testThe msg requestParameters descParameters
+              && testThe msg requestHeaders descHeaders
   
       generate =  HTTPRequest
               <$> generator descStartLine
               <*> generator descUrl
-              <*> generator descParameters
+              <*> generator descHeaders
               <*> satisfies p_body
   
       generator :: Arbitrary a => (HTTPDescriptor Method -> Maybe (Predicate a)) -> Gen a
@@ -50,11 +50,11 @@ instance With Status where
     where
       app msg =  apply p_body (replyBody msg)
               && testThe msg replyStatus descStartLine
-              && testThe msg replyParameters descParameters
+              && testThe msg replyHeaders descHeaders
   
       generate =  HTTPReply
               <$> generator descStartLine
-              <*> generator descParameters
+              <*> generator descHeaders
               <*> satisfies p_body
   
       generator :: Arbitrary a => (HTTPDescriptor Status -> Maybe (Predicate a)) -> Gen a
@@ -74,8 +74,8 @@ status p = mempty { descStartLine = Just p }
 url :: Predicate String -> HTTPDescriptor s
 url p = mempty { descUrl = Just p }
 
-parameters :: Predicate [(String, String)] -> HTTPDescriptor s
-parameters p = mempty { descParameters = Just p }
+headers :: Predicate [(String, String)] -> HTTPDescriptor s
+headers p = mempty { descHeaders = Just p }
 
 (<>) :: HTTPDescriptor s -> HTTPDescriptor s -> HTTPDescriptor s
 (<>) = mappend

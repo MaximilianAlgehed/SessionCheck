@@ -30,7 +30,7 @@ instance Monoid (HTTPDescriptor s) where
 
   l `mappend` r = Desc (maybe (descStartLine l) Just (descStartLine r))
                        (maybe (descUrl l) Just (descUrl r))
-                       (maybe (descParameters l) Just (descParameters r))
+                       (maybe (descHeaders l) Just (descHeaders r))
 
 instance Arbitrary Method where
   arbitrary = elements [GET, POST]
@@ -39,15 +39,14 @@ instance Arbitrary Status where
   arbitrary = StatusCode . abs <$> arbitrary
 
 instance IsHTTPBody a => HTTPRequest a :< HTTPData where
-  inj msg = HTTP { httpMethod     = show (requestMethod msg)
+  inj msg = HTTP { httpMethod     = requestMethod msg
                  , httpUrl        = requestUrl msg
-                 , httpParameters = requestParameters msg
+                 , httpHeaders = requestHeaders msg
                  , httpBody       = body (requestBody msg) }
 
   prj http = do
     body   <- parseBody (httpBody http)
-    method <- readMaybe (httpMethod http)
-    return $ HTTPRequest { requestMethod     = method
+    return $ HTTPRequest { requestMethod     = httpMethod http
                          , requestUrl        = httpUrl http
-                         , requestParameters = httpParameters http
+                         , requestHeaders = httpHeaders http
                          , requestBody       = body }

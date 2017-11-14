@@ -6,10 +6,10 @@ import GHC.Generics
 
 import SessionCheck.Predicate
 
-data HTTPData = HTTP { httpMethod     :: String
-                     , httpUrl        :: String
-                     , httpParameters :: [(String, String)]
-                     , httpBody       :: String }
+data HTTPData = HTTP { httpMethod  :: Method
+                     , httpUrl     :: String
+                     , httpHeaders :: [(String, String)]
+                     , httpBody    :: String }
                      deriving (Ord, Eq, Show, NFData, Generic)
 
 data Method = GET
@@ -18,22 +18,22 @@ data Method = GET
 
 newtype Status = StatusCode Int deriving (Ord, Eq, Show, NFData, Generic)
 
-data HTTPRequest a = HTTPRequest { requestMethod     :: Method
-                                 , requestUrl        :: String 
-                                 , requestParameters :: [(String, String)]
-                                 , requestBody       :: a }
+data HTTPRequest a = HTTPRequest { requestMethod  :: Method
+                                 , requestUrl     :: String 
+                                 , requestHeaders :: [(String, String)]
+                                 , requestBody    :: a }
                                  deriving (Ord, Eq, Show, NFData, Generic)
 
 
-data HTTPReply a = HTTPReply { replyStatus     :: Status
-                             , replyParameters :: [(String, String)]
-                             , replyBody       :: a }
+data HTTPReply a = HTTPReply { replyStatus  :: Status
+                             , replyHeaders :: [(String, String)]
+                             , replyBody    :: a }
                              deriving (Ord, Eq, Show, NFData, Generic)
 
 
 
-data HTTPDescriptor s = Desc { descStartLine  :: Maybe (Predicate s)
-                             , descUrl        :: Maybe (Predicate String)
-                             , descParameters :: Maybe (Predicate [(String, String)]) }
+data HTTPDescriptor s = Desc { descStartLine :: Maybe (Predicate s)
+                             , descUrl       :: Maybe (Predicate String)
+                             , descHeaders   :: Maybe (Predicate [(String, String)]) }
 
 data EmptyBody = EmptyBody deriving (Ord, Eq, Show, NFData, Generic)
