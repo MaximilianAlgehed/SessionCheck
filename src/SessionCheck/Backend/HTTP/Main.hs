@@ -72,11 +72,6 @@ runClient opts imp = do
           Just (Reply _) -> kill imp (Bad "Specification does not follow request-reply structure")
           _ -> loop manager
 
-runServer :: Options
-          -> Implementation HTTPMessage
-          -> IO ()
-runServer opts imp = undefined
-
 httpMain :: ProtocolRole
          -> Options
          -> Spec HTTPMessage a -- Specification
