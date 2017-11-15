@@ -33,7 +33,7 @@ issueRequest :: Manager
              -> HTTPRequest String
              -> IO (HTTPReply String)
 issueRequest manager host req = do
-  initRequest <- parseRequest $ host ++ "/" ++ requestUrl req
+  initRequest <- parseRequest $ host ++ requestUrl req
   let request = initRequest { method         = pack $ show (requestMethod req)
                             , requestHeaders = [ (mk (pack n), pack v) | (n, v) <- T.requestHeaders req ]
                             , requestBody    = RequestBodyBS . pack . T.requestBody $ req
@@ -80,7 +80,11 @@ httpMain r opts spec = case r of
   Server -> do
     imp <- clean
     tid <- forkIO $ Warp.run (port opts) (runfun imp)
-    sessionCheck (imp { run = void $ spawnCommand (program opts ++ " > /dev/null")  }) spec
+    sessionCheck (imp { run = do ph <- spawnCommand (program opts ++ " > /dev/null") 
+                                 takeMVar (dead imp)  
+                                 terminateProcess ph
+                                 putMVar (done imp) ()
+                      }) spec
     killThread tid
     where
       runfun imp req cont = do
@@ -91,15 +95,26 @@ httpMain r opts spec = case r of
                                                                         (L.unpack body)
         d <- isDead imp
         when d $ throwIO (userError "Something went wrong!")
-        m <- atomically $ readTChan (outputChan imp)
+        m <- performRead imp
         r <- case m of
-              Reply r -> return $ Wai.responseLBS (mkStatus (let StatusCode s = replyStatus r in s) mempty)
-                                                  [(mk (pack n), pack v) | (n, v) <- replyHeaders r]
-                                                  (L.pack (replyBody r))
+              Just (Reply r) -> return $ Wai.responseLBS (mkStatus (let StatusCode s = replyStatus r in s) mempty)
+                                                         [(mk (pack n), pack v) | (n, v) <- replyHeaders r]
+                                                         (L.pack (replyBody r))
               _ -> do
                 kill imp (Bad "Specification does not follow request-reply structure")
                 throwIO $ userError "Something went wrong!"
         cont r
+
+      performRead imp = do
+        d <- isDead imp
+        if d
+        then return Nothing
+        else do
+          empty <- atomically $ isEmptyTChan (outputChan imp)
+          if empty
+          then yield >> performRead imp
+          else Just <$> atomically (readTChan (outputChan imp))
+
   Client -> do
     ph <- spawnCommand $ program opts ++ " > /dev/null"
     imp <- clean 
