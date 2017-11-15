@@ -106,5 +106,7 @@ httpMain r opts spec = case r of
                 throwIO $ userError "Something went wrong!"
         cont r
   Client -> do
+    ph <- spawnCommand $ program opts ++ " > /dev/null"
     imp <- clean 
     sessionCheck (imp { run = runClient opts imp }) spec
+    terminateProcess ph
