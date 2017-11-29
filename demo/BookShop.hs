@@ -1,25 +1,23 @@
-{-# LANGUAGE TypeOperators
-           , FlexibleContexts
-           , DeriveGeneric #-}
-
+{-# LANGUAGE TypeOperators, FlexibleContexts, DeriveGeneric, MultiParamTypeClasses #-}
 
 module BookShop where
 
 import Test.QuickCheck
 import GHC.Generics (Generic, Generic1)
 import Control.DeepSeq
+import Foreign.Erlang
 
 import SessionCheck
 import SessionCheck.Backend.Erlang
 
-data Request = Order String
+data Request = Order Int 
              | Checkout
              deriving (Generic)
 
-data Reply   = Basket { basket :: [String] }
-             deriving (Generic)
+data Reply = Basket { basket :: [Int] }
+           deriving (Generic)
 
-loop :: Request :< t => [String] -> Spec t [String]
+loop :: Request :< t => [Int] -> Spec t [Int]
 loop books = do
   r <- send anyRequest
   case r of
@@ -33,12 +31,10 @@ clientSpec = do
 
 main :: IO ()
 main = do
-  print ()
-  --erlangMain "bookShop:main" clientSpec
-  --
+  erlangMain "bookShop:main" clientSpec
 
 instance Arbitrary Request where
-  arbitrary = oneof [Order <$> arbitrary, return Checkout]
+  arbitrary = oneof [Order <$> fmap abs arbitrary, return Checkout]
 
 instance NFData Reply
 
@@ -47,8 +43,21 @@ instance Arbitrary Reply where
 
 instance NFData Request
 
-supersetOfReply :: [String] -> Predicate Reply
+supersetOfReply :: [Int] -> Predicate Reply
 supersetOfReply = bimap Basket basket . supersetOf
 
 anyRequest :: Predicate Request
 anyRequest = anything
+
+instance Request :< ErlType where
+  inj Checkout  = ErlAtom "checkout"
+  inj (Order s) = ErlTuple [ErlAtom "order", inj s]
+
+  prj (ErlAtom "checkout") = Just Checkout
+  prj (ErlTuple [ErlAtom "order", s]) = Order <$> prj s
+  prj _ = Nothing
+
+instance Reply :< ErlType where
+  inj (Basket bs) = ErlList $ map inj bs
+
+  prj = fmap Basket . prj 

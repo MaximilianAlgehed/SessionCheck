@@ -9,24 +9,16 @@ f() ->
     _ -> loop([])
   end.
 
-loop(XS) ->
+loop(Bs) ->
   receive 
-    {_, I} -> continue(I, XS)
+    {Hs, checkout}  -> Hs ! Bs, exit(done);
+    {_, {order, B}} -> continue(B, Bs)
   end.
 
-continue(I, XS) ->
+continue(B, Bs) ->
   Lst = if
-          I < 0 -> XS;
+          B == 0 -> Bs;
           %length(XS) >= 5 -> XS;
-          true  -> [I|XS]
+          true  -> [B|Bs]
         end,
-  receive 
-    {_,  "another"} -> loop(Lst);
-    {Hs, "request"} -> Hs ! Lst, finish(Lst)
-  end.
-
-finish(XS) ->
-  receive
-    {_, "another"} -> loop(XS);
-    {_, "done"}    -> exit(done)
-  end.
+  loop(Lst).
