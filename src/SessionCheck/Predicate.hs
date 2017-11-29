@@ -17,6 +17,11 @@ data Predicate a =
             , shrunk    :: a -> Gen a
             , name      :: String }
 
+bimap :: (a -> b) -> (b -> a) -> Predicate a -> Predicate b
+bimap toB toA p = p { apply     = apply p . toA
+                    , satisfies = toB <$> satisfies p
+                    , shrunk    = \b -> toB <$> shrunk p (toA b) }
+
 -- Test if a `t` satisfies a predicate for `a`s when `a :< t`
 test :: a :< t => Predicate a -> t -> Bool
 test p t = maybe False id (apply p <$> prj t)
@@ -88,6 +93,13 @@ permutationOf as = Predicate { apply     = \as' -> sort as == sort as'
                              , satisfies = shuffle as
                              , shrunk    = \as -> shuffle as
                              , name      = "permutationOf " ++ show as }
+
+-- Accepts any superset of `as`
+supersetOf :: (Arbitrary a, Eq a, Show a) => [a] -> Predicate [a]
+supersetOf as = Predicate { apply     = \as' -> all (`elem` as') as
+                          , satisfies = arbitrary >>= \as' -> shuffle (as ++ as')
+                          , shrunk    = error $ "Shrinking of \"supersetOf " ++ show as ++ " \" not implemented" 
+                          , name      = "supersetOf " ++ show as }
 
 -- Accepts precisely `a`
 is :: (Eq a, Show a) => a -> Predicate a
