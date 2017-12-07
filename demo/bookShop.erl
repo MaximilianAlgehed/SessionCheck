@@ -17,8 +17,7 @@ loop(Bs) ->
 
 continue(B, Bs) ->
   Lst = if
-          B == 0 -> Bs;
-          %length(XS) >= 5 -> XS;
-          true  -> [B|Bs]
+          B < 1  -> Bs;
+          true   -> [B|Bs]
         end,
   loop(Lst).

@@ -34,7 +34,7 @@ main = do
   erlangMain "bookShop:main" clientSpec
 
 instance Arbitrary Request where
-  arbitrary = oneof [Order <$> fmap abs arbitrary, return Checkout]
+  arbitrary = oneof [Order . (+1) . abs <$> arbitrary, return Checkout]
 
 instance NFData Reply
 
